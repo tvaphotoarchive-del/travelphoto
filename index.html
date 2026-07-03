@@ -67,7 +67,6 @@
                 <div class="flex items-center gap-4">
                     <button onclick="window.clearFilters()" class="text-sm text-gray-500 hover:text-gray-800 transition-colors">清除條件</button>
                     <input type="file" accept="image/*" multiple class="hidden" id="fileInput" onchange="window.handleBatchUpload(event)" />
-                    <!-- 將 button 替換為 label，並使用 CSS 控制禁用狀態 (pointer-events-none) -->
                     <label for="fileInput" id="uploadBtnLabel" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors shadow-sm whitespace-nowrap cursor-pointer opacity-50 pointer-events-none">
                         <i data-lucide="layers" class="w-4 h-4"></i> 批量上傳
                     </label>
@@ -83,7 +82,6 @@
                     專案排版資源夾
                     <span id="moodboard-count" class="bg-blue-100 text-blue-700 text-xs py-0.5 px-2 rounded-full">0 張</span>
                 </h2>
-                <!-- 修改區：年份與期數設定改為動態渲染下拉選單 -->
                 <div class="flex gap-2" id="project-export-settings">
                     <!-- 動態渲染選項 -->
                 </div>
@@ -104,11 +102,9 @@
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        
-        // 【修改 1】：引入 initializeFirestore, persistentLocalCache, persistentMultipleTabManager 來支援本地快取
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, setDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-        // 1. 已更新為最新的 firebaseConfig
+        // === 1. 已更新為最新的 firebaseConfig ===
         const firebaseConfig = typeof __firebase_config !== 'undefined' && __firebase_config ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyAfB6THM5bJNd5wsBwpabMCkEak80xcMrc",
             authDomain: "photo-ed222.firebaseapp.com",
@@ -122,17 +118,14 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        
-        // 【修改 2】：使用 initializeFirestore 替換原本的 getFirestore，並開啟「多分頁本地快取」
         const db = initializeFirestore(app, {
             localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
         });
-        
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'travel-lens-prod';
 
         const SAMPLE_PHOTOS = [
-            { url: 'https://images.unsplash.com/photo-1493770348161-369560ae357d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80', title: '法國巴黎-餐飲與美食-2026-Vol.12', content: '餐飲與美食', year: '2026', issue: 'Vol.12', locationCity: '法國-巴黎', locationDist: '' },
-            { url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80', title: '台灣花蓮-自然與人文-2026-Vol.13', content: '自然與人文', year: '2026', issue: 'Vol.13', locationCity: '台灣-花蓮', locationDist: '秀林鄉' }
+            { url: 'https://images.unsplash.com/photo-1493770348161-369560ae357d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80', title: '法國-巴黎-餐飲與美食-2026-Vol.12-早午餐特寫', customText: '早午餐特寫', content: '餐飲與美食', year: '2026', issue: 'Vol.12', locationCity: '法國-巴黎', locationDist: '' },
+            { url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80', title: '台灣-花蓮-秀林鄉-自然與人文-2026-Vol.13-壯麗雲海', customText: '壯麗雲海', content: '自然與人文', year: '2026', issue: 'Vol.13', locationCity: '台灣-花蓮', locationDist: '秀林鄉' }
         ];
 
         const state = {
@@ -233,11 +226,9 @@
             
             if (state.user) {
                 el.innerHTML = `<span class="flex items-center text-green-600 bg-green-50 px-2 py-1 rounded-full"><i data-lucide="cloud" class="w-3 h-3 mr-1"></i> 雲端已連線</span>`;
-                // 連線成功時，移除半透明與禁用點擊的 CSS
                 if (btnLabel) btnLabel.classList.remove('opacity-50', 'pointer-events-none');
             } else {
                 el.innerHTML = `<span class="flex items-center text-red-500 bg-red-50 px-2 py-1 rounded-full"><i data-lucide="cloud-off" class="w-3 h-3 mr-1"></i> 雲端連線中...</span>`;
-                // 未連線時，加上半透明與禁用點擊的 CSS
                 if (btnLabel) btnLabel.classList.add('opacity-50', 'pointer-events-none');
             }
         }
@@ -246,13 +237,10 @@
             const container = document.getElementById('filters-container');
             let html = '';
             
-            // 1. 內容與體驗
             html += renderFilterSection('content', '內容與體驗', 'bookmark', 'blue', state.categories.content);
-            // 2. 年份與期數
             html += renderFilterSection('year', '發行年份', 'calendar', 'purple', state.categories.year);
             html += renderFilterSection('issue', '雜誌期數', 'book-open', 'orange', state.categories.issue);
             
-            // 3. 巢狀地理位置
             html += `
             <div class="mb-6">
                 <h3 class="text-sm font-semibold text-gray-900 mb-3 flex items-center justify-between">
@@ -348,7 +336,6 @@
                 const matchYear = state.filters.year.length === 0 || state.filters.year.includes(photo.year);
                 const matchIssue = state.filters.issue.length === 0 || state.filters.issue.includes(photo.issue);
                 
-                // 巢狀地點過濾邏輯
                 let matchLocation = true;
                 if (state.filters.locationCity.length > 0 || state.filters.locationDist.length > 0) {
                     const cityMatch = state.filters.locationCity.includes(photo.locationCity);
@@ -410,8 +397,6 @@
             const btn = document.getElementById('exportBtn');
             const settingsContainer = document.getElementById('project-export-settings');
 
-            // --- 動態渲染右側匯出設定的下拉選單 ---
-            // 抓取當前已選的值，如果沒有則預設為空
             const currentYear = document.getElementById('project-year')?.value || '';
             const currentIssue = document.getElementById('project-issue')?.value || '';
 
@@ -487,7 +472,6 @@
                             </div>
                             ${state.batchStatus === 'analyzing' ? `<div class="flex items-center gap-2 text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full text-sm font-medium"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 處理中...</div>` : ''}
                         </div>
-                        <!-- 【修復捲動丟失】為該區域加上 ID "batch-modal-content" 以利記憶捲動位置 -->
                         <div id="batch-modal-content" class="flex-1 overflow-y-auto bg-gray-100/50 p-4 md:p-6 space-y-4">
                             ${state.uploadBatch.map((item, index) => {
                                 const tagPrefix = [item.suggestions.locationCity, item.suggestions.locationDist, item.suggestions.content, item.suggestions.year, item.suggestions.issue].filter(Boolean).join('-');
@@ -576,6 +560,7 @@
                 const photo = state.editModal.photo;
                 const cityOpts = Object.keys(state.categories.locationHierarchy);
                 const distOpts = photo.locationCity ? state.categories.locationHierarchy[photo.locationCity] : [];
+                const tagPrefix = [photo.locationCity, photo.locationDist, photo.content, photo.year, photo.issue].filter(Boolean).join('-');
                 
                 html += `
                 <div class="fixed inset-0 z-[105] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm px-4 py-6">
@@ -584,11 +569,16 @@
                             <i data-lucide="pencil" class="w-4 h-4 text-gray-500"></i>
                             <h3 class="font-bold text-gray-900">編輯照片屬性</h3>
                         </div>
-                        <!-- 【修復捲動丟失】為該區域加上 ID "edit-modal-content" 以利記憶捲動位置 -->
                         <div id="edit-modal-content" class="p-6 overflow-y-auto space-y-6">
-                            <div>
-                                <label class="block text-xs font-medium text-gray-700 mb-2">完整照片名稱</label>
-                                <input type="text" value="${photo.title}" oninput="window.updateEditModalTitle(this.value)" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" />
+                            
+                            <!-- 加入動態標題預覽與自訂文字輸入 -->
+                            <div class="flex flex-col gap-1 mb-2">
+                                <label class="text-[10px] uppercase font-bold text-gray-500 flex items-center gap-1"><i data-lucide="tag" class="w-3 h-3"></i> 最終命名</label>
+                                <div class="flex flex-col sm:flex-row sm:items-center gap-2 bg-white border border-gray-300 rounded-md p-2">
+                                    <span class="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-1.5 rounded truncate shrink-0 max-w-full sm:max-w-[200px]">${tagPrefix || '無標籤'}</span>
+                                    <span class="text-gray-400 font-bold hidden sm:block">+</span>
+                                    <input type="text" value="${photo.customText || ''}" oninput="window.updateEditModalCustomText(this.value)" placeholder="輸入自訂文字..." class="font-medium text-gray-900 border-b border-transparent hover:border-gray-300 focus:border-blue-500 bg-transparent outline-none px-1 py-1 w-full min-w-0 transition-colors" />
+                                </div>
                             </div>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-green-50/50 rounded-lg border border-green-100">
@@ -689,7 +679,7 @@
             if (state.tagModal.isOpen) setTimeout(() => document.getElementById('newTagInput')?.focus(), 10);
         }
 
-        // 修改更新函式：保存捲動位置
+        // 修改更新函式：保存捲動位置，解決畫面亂跳的問題
         function updateModals() {
             // 1. 記憶捲動位置
             const batchModal = document.getElementById('batch-modal-content');
@@ -700,11 +690,13 @@
             renderModals();
             lucide.createIcons();
 
-            // 2. 恢復捲動位置
-            const newBatchModal = document.getElementById('batch-modal-content');
-            const newEditModal = document.getElementById('edit-modal-content');
-            if (newBatchModal && batchScrollTop > 0) newBatchModal.scrollTop = batchScrollTop;
-            if (newEditModal && editScrollTop > 0) newEditModal.scrollTop = editScrollTop;
+            // 2. 恢復捲動位置 (使用 requestAnimationFrame 確保畫面已經重新繪製)
+            requestAnimationFrame(() => {
+                const newBatchModal = document.getElementById('batch-modal-content');
+                const newEditModal = document.getElementById('edit-modal-content');
+                if (newBatchModal && batchScrollTop > 0) newBatchModal.scrollTop = batchScrollTop;
+                if (newEditModal && editScrollTop > 0) newEditModal.scrollTop = editScrollTop;
+            });
         }
 
         function updateUI() { renderAuthStatus(); updateFilters(); updateGallery(); updateMoodBoard(); updateModals(); }
@@ -735,32 +727,50 @@
             updateGallery(); updateMoodBoard();
         };
 
+        // 開啟編輯畫面：解析並準備 CustomText
         window.openEditModal = (photoId) => {
             const photo = state.photos.find(p => p.id === photoId);
-            if (photo) { state.editModal = { isOpen: true, photo: { ...photo } }; updateModals(); }
+            if (photo) { 
+                let cText = photo.customText !== undefined ? photo.customText : '';
+                // 為了向下相容以前上傳沒有 customText 的照片
+                if (photo.customText === undefined && photo.title) {
+                     const tags = [photo.locationCity, photo.locationDist, photo.content, photo.year, photo.issue].filter(Boolean);
+                     const prefix = tags.join('-');
+                     if (photo.title.startsWith(prefix + '-')) cText = photo.title.replace(prefix + '-', '');
+                     else if (photo.title !== prefix) cText = photo.title; 
+                }
+                state.editModal = { isOpen: true, photo: { ...photo, customText: cText } }; 
+                updateModals(); 
+            }
         };
+        
         window.closeEditModal = () => { state.editModal = { isOpen: false, photo: null }; updateModals(); };
-        window.updateEditModalTitle = (val) => { if (state.editModal.photo) state.editModal.photo.title = val; };
+        window.updateEditModalCustomText = (val) => { if (state.editModal.photo) state.editModal.photo.customText = val; };
         
         window.updateEditModalField = (field, value) => {
             if (state.editModal.photo) {
                 state.editModal.photo[field] = value;
-                // 若更改縣市，清空區域
-                if(field === 'locationCity' && state.editModal.photo.locationDist) {
-                    state.editModal.photo.locationDist = '';
-                }
+                if(field === 'locationCity' && state.editModal.photo.locationDist) state.editModal.photo.locationDist = '';
                 updateModals();
             }
         };
 
+        // 編輯畫面：儲存並重新組合名稱
         window.savePhotoEdit = async () => {
             if (!state.user || !state.editModal.photo) return;
             const photo = state.editModal.photo;
-            const title = photo.title.trim() || '未命名圖片';
+            const tags = [photo.locationCity, photo.locationDist, photo.content, photo.year, photo.issue].filter(Boolean);
+            const finalTitle = [...tags, photo.customText || ''].filter(Boolean).join('-') || '未命名圖片';
+            
             try {
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'photos', photo.id), { 
-                    title, content: photo.content || '', year: photo.year || '', issue: photo.issue || '', 
-                    locationCity: photo.locationCity || '', locationDist: photo.locationDist || ''
+                    title: finalTitle, 
+                    customText: photo.customText || '',
+                    content: photo.content || '', 
+                    year: photo.year || '', 
+                    issue: photo.issue || '', 
+                    locationCity: photo.locationCity || '', 
+                    locationDist: photo.locationDist || ''
                 }, { merge: true });
                 window.closeEditModal();
             } catch (err) { console.error(err); alert("儲存失敗"); }
@@ -932,7 +942,17 @@
                     const s = item.suggestions;
                     const tags = [s.locationCity, s.locationDist, s.content, s.year, s.issue].filter(Boolean);
                     let finalTitle = [...tags, s.customText || ''].filter(Boolean).join('-');
-                    await addDoc(pRef, { url: item.url, title: finalTitle || '未命名', content: s.content||'', year: s.year||'', issue: s.issue||'', locationCity: s.locationCity||'', locationDist: s.locationDist||'', createdAt: Date.now() });
+                    await addDoc(pRef, { 
+                        url: item.url, 
+                        title: finalTitle || '未命名', 
+                        customText: s.customText || '',
+                        content: s.content||'', 
+                        year: s.year||'', 
+                        issue: s.issue||'', 
+                        locationCity: s.locationCity||'', 
+                        locationDist: s.locationDist||'', 
+                        createdAt: Date.now() 
+                    });
                 }
                 window.closeBatchModal();
             } catch (e) { state.batchStatus = 'review'; updateModals(); }
