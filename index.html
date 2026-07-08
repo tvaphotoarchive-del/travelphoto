@@ -59,7 +59,7 @@
             </div>
         </aside>
 
-        <!-- 2. 中央照片網格 -->
+        <!-- 2. 中央照片網格 (具備前端無限捲動監聽) -->
         <main class="w-full md:flex-1 flex flex-col h-[70vh] md:h-screen overflow-hidden z-10 bg-gray-50 shrink-0">
             <header class="h-auto md:h-16 py-3 md:py-0 bg-white border-b border-gray-200 flex flex-col md:flex-row items-center justify-between px-6 shrink-0 gap-3 md:gap-0">
                 <div id="gallery-stats" class="flex items-center gap-2 text-sm text-gray-500"></div>
@@ -71,7 +71,7 @@
                     </label>
                 </div>
             </header>
-            <div id="gallery-container" class="flex-1 overflow-y-auto p-4 md:p-6"></div>
+            <div id="gallery-container" onscroll="window.handleGalleryScroll(this)" class="flex-1 overflow-y-auto p-4 md:p-6 relative"></div>
         </main>
 
         <!-- 3. 右側企劃板 -->
@@ -135,6 +135,9 @@
         const state = {
             user: null,
             photos: [],
+            // 加入前端分頁狀態
+            displayLimit: 20,
+            currentDisplayedPhotos: [],
             categories: {
                 content: ['景點與娛樂', '餐飲與美食', '住宿與交通', '自然與人文'], 
                 year: ['2026', '2027', '2028'],
@@ -237,6 +240,7 @@
         // 監聽前端文字模糊搜尋
         document.getElementById('searchInput').addEventListener('input', (e) => {
             state.searchQuery = e.target.value;
+            state.displayLimit = 20; // 搜尋時重置顯示數量
             renderGallery();
         });
 
@@ -247,6 +251,7 @@
                 if (type === 'locationDist') state.filters[type] = [value];
                 else state.filters[type].push(value);
             }
+            state.displayLimit = 20; // 篩選時重置顯示數量
             updateFilters();
             renderGallery();
         };
@@ -255,8 +260,20 @@
             document.getElementById('searchInput').value = '';
             state.searchQuery = '';
             state.filters = { content: [], year: [], issue: [], locationCity: [], locationDist: [] };
+            state.displayLimit = 20; // 清除篩選時重置顯示數量
             updateFilters();
             renderGallery();
+        };
+
+        // 前端無限捲動監聽器
+        window.handleGalleryScroll = (el) => {
+            // 如果捲動到底部距離小於 100px，且還有尚未顯示的照片，就增加顯示上限並重新渲染
+            if (el.scrollHeight - el.scrollTop <= el.clientHeight + 100) {
+                if (state.displayLimit < state.currentDisplayedPhotos.length) {
+                    state.displayLimit += 20;
+                    renderGallery(true); // 傳入 true 表示是滾動加載，避免畫面回到頂部
+                }
+            }
         };
 
         function renderAuthStatus() {
@@ -342,8 +359,12 @@
             return html + `</div>`;
         }
 
-        function renderGallery() {
+        function renderGallery(isScrollLoad = false) {
             const container = document.getElementById('gallery-container'); const stats = document.getElementById('gallery-stats');
+            
+            // 記住當前的滾動位置
+            const currentScrollTop = container.scrollTop;
+            
             if (container.innerHTML.includes('資料庫連線權限異常')) return;
 
             // 【核心過濾邏輯：前端全包模糊搜尋】
@@ -368,6 +389,12 @@
                 return matchSearch && matchContent && matchYear && matchIssue && matchLocation;
             });
 
+            // 存下所有過濾後的照片，供滾動監聽使用
+            state.currentDisplayedPhotos = filteredPhotos;
+            
+            // 切割出當前要顯示的照片 (例如前 20 張)
+            const photosToDisplay = filteredPhotos.slice(0, state.displayLimit);
+
             stats.innerHTML = `<i data-lucide="filter" class="w-4 h-4"></i> 共 ${state.photos.length} 張 / 篩選出 ${filteredPhotos.length} 張`;
 
             if (state.isLoading) {
@@ -380,8 +407,8 @@
                  container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-gray-400 py-10"><i data-lucide="filter" class="w-12 h-12 mb-4 opacity-20"></i><p>沒有符合條件的照片</p></div>`; return;
             }
 
-            let html = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">`;
-            filteredPhotos.forEach(photo => {
+            let html = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 pb-10">`;
+            photosToDisplay.forEach(photo => {
                 const isSelected = state.moodBoard.some(p => p.id === photo.id);
                 const locDisplay = [photo.locationCity, photo.locationDist].filter(Boolean).join(', ');
                 html += `
@@ -411,8 +438,20 @@
             });
             html += `</div>`;
             
+            // 如果還有未顯示的圖片，在最下方顯示載入中的小動畫
+            if (state.displayLimit < filteredPhotos.length) {
+                html += `<div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-md text-xs text-blue-600 font-medium flex items-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 往下滑動載入更多...</div>`;
+            } else if (filteredPhotos.length > 20) {
+                 html += `<div class="text-center py-6 text-xs text-gray-400">已顯示全部照片</div>`;
+            }
+            
             container.innerHTML = html;
             lucide.createIcons();
+            
+            // 如果是滾動加載，維持原本的滾動位置，避免畫面跳回最上面
+            if (isScrollLoad) {
+                container.scrollTop = currentScrollTop;
+            }
         }
 
         window.toggleMoodBoard = (photoId) => {
