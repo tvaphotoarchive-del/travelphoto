@@ -218,7 +218,7 @@
                     if (docSnap.exists()) { state.categories = { ...state.categories, ...docSnap.data() }; updateFilters(); updateModals(); }
                 });
                 
-                // 【核心改回前端全包監聽】 - 結合 LocalCache，依然超級省讀取額度！
+                // 【核心改回前端全包監聽】 - 結合 LocalCache，超級省讀取額度！
                 const photosRef = collection(db, 'artifacts', appId, 'public', 'data', 'photos');
                 unsubPhotos = onSnapshot(photosRef, (snapshot) => {
                     const fetchedPhotos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -460,7 +460,8 @@
             const index = state.moodBoard.findIndex(p => p.id === photoId);
             if (index > -1) state.moodBoard.splice(index, 1);
             else state.moodBoard.push(photo);
-            renderGallery(); renderMoodBoard();
+            renderGallery(true); // 使用 true 以保持滾動位置
+            renderMoodBoard();
         };
 
         function renderMoodBoard() {
