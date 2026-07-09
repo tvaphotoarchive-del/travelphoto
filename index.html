@@ -266,8 +266,11 @@
             // 如果捲動到底部的距離小於 150px，且還有尚未顯示的照片，就增加 15 張的顯示上限並重新渲染
             if (el.scrollHeight - el.scrollTop <= el.clientHeight + 150) {
                 if (state.displayLimit < state.currentDisplayedPhotos.length) {
+                    if (state.isScrolling) return; // 加入防抖機制，避免瞬間狂載入
+                    state.isScrolling = true;
                     state.displayLimit += 15;
                     renderGallery(true); // 傳入 true 表示是滾動加載，避免畫面回到頂部
+                    setTimeout(() => { state.isScrolling = false; }, 50); // 短暫鎖定
                 }
             }
         };
@@ -392,7 +395,8 @@
             // 【前端分頁限制】：只切割出當前需要顯示的照片數量
             const photosToDisplay = filteredPhotos.slice(0, state.displayLimit);
 
-            stats.innerHTML = `<i data-lucide="filter" class="w-4 h-4"></i> 共 ${state.photos.length} 張 / 篩選出 ${filteredPhotos.length} 張`;
+            // 修改上方文字，讓您清楚知道現在 DOM 只有渲染幾張
+            stats.innerHTML = `<i data-lucide="filter" class="w-4 h-4"></i> 雲端總數 ${filteredPhotos.length} 張 / 畫面實際畫出 ${photosToDisplay.length} 張`;
 
             if (state.isLoading) {
                 container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-gray-400 py-20"><i data-lucide="refresh-cw" class="animate-spin mb-4 text-blue-500 w-8 h-8"></i><p>載入圖庫中...</p></div>`; return;
@@ -434,13 +438,14 @@
                     </div>`;
             });
             
-            // 底部無限捲動的優雅提示
+            html += `</div>`; // 先把 grid 網格關閉，避免按鈕跟照片重疊破版
+            
+            // 底部無限捲動的優雅提示 (移出 grid 網格外，徹底解決破版)
             if (state.displayLimit < filteredPhotos.length) {
-                html += `<div class="col-span-1 sm:col-span-2 lg:col-span-3 py-8 flex justify-center"><div class="bg-white px-5 py-2.5 rounded-full shadow-sm border border-gray-200 text-xs text-blue-600 font-medium flex items-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 往下滑動載入更多...</div></div>`;
+                html += `<div class="w-full py-8 flex justify-center shrink-0"><div class="bg-white px-5 py-2.5 rounded-full shadow-sm border border-gray-200 text-xs text-blue-600 font-medium flex items-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 往下滑動載入更多... (${photosToDisplay.length}/${filteredPhotos.length})</div></div>`;
             } else if (filteredPhotos.length > 15) {
-                html += `<div class="col-span-1 sm:col-span-2 lg:col-span-3 py-6 text-center text-xs text-gray-400">已顯示全部照片</div>`;
+                html += `<div class="w-full py-6 text-center text-xs text-gray-400 shrink-0">已顯示全部 ${filteredPhotos.length} 張照片</div>`;
             }
-            html += `</div>`;
             
             container.innerHTML = html;
             lucide.createIcons();
