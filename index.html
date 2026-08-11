@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TravelLens 旅遊視覺資產管理</title>
+    <title>TravelLens 旅遊視覺資產管理 (萬張優化版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -52,9 +52,15 @@
                 <div id="auth-status" class="mt-2 text-xs font-medium"></div>
             </div>
             <div class="p-5 flex-1 overflow-y-auto max-h-[40vh] md:max-h-none">
-                <div class="relative mb-6">
-                    <input type="text" id="searchInput" placeholder="搜尋關鍵字..." class="w-full pl-9 pr-3 py-2 bg-gray-100 border-transparent rounded-md text-sm focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
-                    <i data-lucide="search" class="absolute left-3 top-2.5 text-gray-400 w-4 h-4"></i>
+                <div class="relative mb-6 flex gap-2">
+                    <div class="relative flex-1">
+                        <input type="text" id="searchInput" placeholder="搜尋關鍵字..." class="w-full pl-9 pr-3 py-2 bg-gray-100 border-transparent rounded-md text-sm focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
+                        <i data-lucide="search" class="absolute left-3 top-2.5 text-gray-400 w-4 h-4"></i>
+                    </div>
+                    <!-- 加入重新整理按鈕 -->
+                    <button onclick="window.loadPhotos()" class="p-2 bg-gray-100 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-md transition-colors shadow-sm" title="重新整理圖庫">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    </button>
                 </div>
                 <div id="filters-container"></div>
             </div>
@@ -100,7 +106,8 @@
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        // 新增引入 runTransaction 與 limit 用於批次處理與安全限制
+        import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, getDocs, query, orderBy, runTransaction, limit } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' && __firebase_config ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyAfB6THM5bJNd5wsBwpabMCkEak80xcMrc",
@@ -120,16 +127,10 @@
         });
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'travel-lens-prod';
 
-        const SAMPLE_PHOTOS = [
-            { url: 'https://images.unsplash.com/photo-1493770348161-369560ae357d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80', title: '法國-巴黎-餐飲與美食-2026-Vol.12-早午餐特寫', customText: '早午餐特寫', content: '餐飲與美食', year: '2026', issue: 'Vol.12', locationCity: '法國-巴黎', locationDist: '' },
-            { url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80', title: '台灣-花蓮-秀林鄉-自然與人文-2026-Vol.13-壯麗雲海', customText: '壯麗雲海', content: '自然與人文', year: '2026', issue: 'Vol.13', locationCity: '台灣-花蓮', locationDist: '秀林鄉' }
-        ];
-
-        // 核心狀態：新增 displayLimit 控制畫面渲染數量
         const state = {
             user: null,
-            photos: [], // 這裡存放資料庫裡 10,000 張照片的「文字屬性」(體積很小)
-            displayLimit: 30, // 畫面初始只渲染 30 張圖片，保護瀏覽器效能
+            photos: [], // 存放所有文字屬性 (批次與單張整合後)
+            displayLimit: 30,
             categories: {
                 content: ['景點與娛樂', '餐飲與美食', '住宿與交通', '自然與人文'], 
                 year: ['2026', '2027', '2028'],
@@ -157,8 +158,9 @@
 
         let unsubTags = null;
         let loadMoreObserver = null;
+        let searchTimeout = null;
 
-        // === 全新的帳號密碼登入邏輯 ===
+        // === 帳號密碼登入邏輯 ===
         window.handleLogin = async (e) => {
             e.preventDefault();
             const email = document.getElementById('email-input').value;
@@ -166,18 +168,15 @@
             const btn = document.getElementById('login-btn');
             const errorEl = document.getElementById('login-error');
             
-            // 按下後按鈕呈現載入狀態
             btn.disabled = true;
             btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 驗證中...';
             errorEl.classList.add('hidden');
             lucide.createIcons();
 
             try {
-                // 呼叫 Firebase 進行帳號密碼驗證
                 const userCred = await signInWithEmailAndPassword(auth, email, pwd);
                 localStorage.setItem('travelLensUid', userCred.user.uid);
                 
-                // 登入成功，隱藏登入畫面並啟動系統
                 document.getElementById('login-screen').classList.add('hidden'); 
                 document.getElementById('app').classList.remove('hidden');
                 initApp(); 
@@ -188,21 +187,16 @@
                 errorEl.classList.remove('hidden');
                 document.getElementById('password-input').value = '';
                 document.getElementById('password-input').focus();
-                
-                // 恢復按鈕狀態
                 btn.disabled = false;
                 btn.innerHTML = '進入系統';
             }
         };
 
-        // === 系統初始化 (不再匿名登入，直接讀取資料庫) ===
         async function initApp() {
-            // 讀取目前登入的使用者資訊
             state.user = { uid: auth.currentUser?.uid || localStorage.getItem('travelLensUid') }; 
             updateUI();
             
             try {
-                // 1. 監聽標籤設定
                 const tagsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'tags_v2');
                 unsubTags = onSnapshot(tagsRef, (docSnap) => {
                     if (docSnap.exists()) { 
@@ -212,26 +206,46 @@
                     }
                 });
                 
-                // 2. 初始載入照片庫 (全庫拉取文字屬性)
                 window.loadPhotos();
                 
-            } catch (err) { 
-                console.error("Firestore Init Error:", err); 
-            }
+            } catch (err) { console.error("Firestore Init Error:", err); }
         }
 
-        // 讀取資料：全庫拉取，利用 Firebase 快取，不會耗費多餘讀取額度
+        // ★★★ 萬張照片讀取防爆核心邏輯 ★★★
         window.loadPhotos = async () => {
             if (!state.user) return;
             state.isLoading = true;
             updateGallery();
 
             try {
-                const photosRef = collection(db, 'artifacts', appId, 'public', 'data', 'photos');
-                const q = query(photosRef, orderBy('createdAt', 'desc'));
-                const snapshot = await getDocs(q);
+                let batchPhotos = [];
+                let legacyPhotos = [];
 
-                state.photos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // 1. 讀取「優化後的批次資料」
+                // (將原本 10,000 張照片打包成約 100~200 個批次文件，讀取次數暴降 98%)
+                const batchRef = collection(db, 'artifacts', appId, 'public', 'data', 'photo_batches');
+                const batchSnap = await getDocs(batchRef);
+                
+                batchSnap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if (data.items && Array.isArray(data.items)) {
+                        data.items.forEach(item => {
+                            // 標記 _isBatch 方便後續編輯刪除時對應正確的儲存路徑
+                            batchPhotos.push({ ...item, batchId: docSnap.id, _isBatch: true });
+                        });
+                    }
+                });
+
+                // 2. 為了向下相容，讀取「舊版的單張格式」 (加上 limit 防爆)
+                const legacyRef = collection(db, 'artifacts', appId, 'public', 'data', 'photos');
+                const oldSnap = await getDocs(query(legacyRef, orderBy('createdAt', 'desc'), limit(1000)));
+                
+                oldSnap.forEach(docSnap => {
+                    legacyPhotos.push({ id: docSnap.id, ...docSnap.data(), _isBatch: false });
+                });
+
+                // 3. 在記憶體中合併並依時間排序 (純文字陣列，對瀏覽器記憶體消耗極低)
+                state.photos = [...batchPhotos, ...legacyPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
             } catch (error) {
                 console.error("Fetch photos error:", error);
@@ -249,7 +263,6 @@
         function renderAuthStatus() {
             const el = document.getElementById('auth-status'); 
             const btnLabel = document.getElementById('uploadBtnLabel');
-            
             if (state.user) {
                 el.innerHTML = `<span class="flex items-center text-green-600 bg-green-50 px-2 py-1 rounded-full"><i data-lucide="cloud" class="w-3 h-3 mr-1"></i> 雲端已連線</span>`;
                 if (btnLabel) btnLabel.classList.remove('opacity-50', 'pointer-events-none');
@@ -354,11 +367,12 @@
             const stats = document.getElementById('gallery-stats');
             if (container.innerHTML.includes('資料庫連線權限異常')) return;
 
-            // 1. 在記憶體中進行高速前端過濾 (模糊搜尋 + 標籤)
+            // 高速前端過濾依然保留，因為文字屬性陣列很小
             const filteredPhotos = state.photos.filter(photo => {
-                const matchSearch = photo.title.toLowerCase().includes(state.searchQuery.toLowerCase()) || 
-                                    (photo.locationCity && photo.locationCity.toLowerCase().includes(state.searchQuery.toLowerCase())) ||
-                                    (photo.locationDist && photo.locationDist.toLowerCase().includes(state.searchQuery.toLowerCase()));
+                const searchTxt = state.searchQuery.toLowerCase();
+                const matchSearch = photo.title?.toLowerCase().includes(searchTxt) || 
+                                    (photo.locationCity && photo.locationCity.toLowerCase().includes(searchTxt)) ||
+                                    (photo.locationDist && photo.locationDist.toLowerCase().includes(searchTxt));
                 const matchContent = state.filters.content.length === 0 || state.filters.content.includes(photo.content);
                 const matchYear = state.filters.year.length === 0 || state.filters.year.includes(photo.year);
                 const matchIssue = state.filters.issue.length === 0 || state.filters.issue.includes(photo.issue);
@@ -369,23 +383,22 @@
                     const distMatch = state.filters.locationDist.includes(`${photo.locationCity}|${photo.locationDist}`);
                     matchLocation = cityMatch || distMatch;
                 }
-                
                 return matchSearch && matchContent && matchYear && matchIssue && matchLocation;
             });
 
             stats.innerHTML = `<i data-lucide="filter" class="w-4 h-4"></i> 共 ${state.photos.length} 張 / 篩選出 ${filteredPhotos.length} 張`;
 
             if (state.isLoading) {
-                container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-gray-400"><i data-lucide="refresh-cw" class="animate-spin mb-4 text-blue-500 w-8 h-8"></i><p>載入圖庫中...</p></div>`; return;
+                container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-gray-400"><i data-lucide="refresh-cw" class="animate-spin mb-4 text-blue-500 w-8 h-8"></i><p>圖庫載入中...</p></div>`; return;
             }
             if (state.photos.length === 0) {
-                container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-gray-400 py-10"><i data-lucide="image" class="w-16 h-16 mb-4 opacity-20"></i><p class="mb-6 text-sm">圖庫目前是空的</p><button onclick="window.handleImportSamples()" class="px-6 py-2 bg-gray-900 text-white rounded-lg">匯入範例</button></div>`; return;
+                container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-gray-400 py-10"><i data-lucide="image" class="w-16 h-16 mb-4 opacity-20"></i><p class="mb-6 text-sm">圖庫目前是空的</p></div>`; return;
             }
             if (filteredPhotos.length === 0) {
                  container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-gray-400 py-10"><i data-lucide="filter" class="w-12 h-12 mb-4 opacity-20"></i><p>沒有符合條件的照片</p></div>`; return;
             }
 
-            // 2. 畫面分頁處理：只取出前 displayLimit 張渲染，保護瀏覽器效能
+            // 控制 DOM 節點數量保護效能
             const photosToRender = filteredPhotos.slice(0, state.displayLimit);
 
             let html = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">`;
@@ -395,7 +408,7 @@
                 html += `
                     <div class="group bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col">
                         <div class="relative aspect-video bg-gray-200 overflow-hidden shrink-0">
-                            <!-- 加入 loading="lazy" 確保圖片不在畫面時不佔用網路 -->
+                            <!-- 加入 loading="lazy" -->
                             <img src="${photo.url}" loading="lazy" alt="${photo.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                             <button onclick="window.toggleMoodBoard('${photo.id}')" class="absolute top-2 right-2 p-2 md:p-1.5 rounded-full shadow-sm backdrop-blur-sm z-10 ${isSelected ? 'bg-blue-600 text-white' : 'bg-white/80 text-gray-700 hover:bg-white'}">
                                 <i data-lucide="${isSelected ? 'check' : 'plus'}" class="w-4 h-4"></i>
@@ -420,20 +433,14 @@
             });
             html += `</div>`;
 
-            // 3. 如果還有未渲染的照片，加入一個用來觸發載入更多的哨兵標籤
             if (state.displayLimit < filteredPhotos.length) {
-                html += `<div id="load-more-sentinel" class="w-full py-8 flex justify-center text-gray-400">
-                            <i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i>
-                         </div>`;
+                html += `<div id="load-more-sentinel" class="w-full py-8 flex justify-center text-gray-400"><i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i></div>`;
             }
 
             container.innerHTML = html;
-            
-            // 4. 重置與綁定滾動偵測器 (Intersection Observer)
             setupScrollObserver();
         }
 
-        // 偵測是否捲動到底部，自動增加顯示數量
         function setupScrollObserver() {
             if (loadMoreObserver) loadMoreObserver.disconnect();
             const sentinel = document.getElementById('load-more-sentinel');
@@ -441,7 +448,7 @@
 
             loadMoreObserver = new IntersectionObserver((entries) => {
                 if (entries[0].isIntersecting) {
-                    state.displayLimit += 30; // 每次多載入 30 張到畫面上
+                    state.displayLimit += 30; 
                     updateGallery();
                 }
             }, { root: document.getElementById('gallery-container'), rootMargin: '100px' });
@@ -449,25 +456,29 @@
             loadMoreObserver.observe(sentinel);
         }
 
-        // 每次搜尋或改變篩選條件時，重置渲染數量
+        // 加上防抖 (Debounce)，防止大量資料打字時當機
         document.getElementById('searchInput').addEventListener('input', (e) => { 
-            state.searchQuery = e.target.value; 
-            state.displayLimit = 30; // 重置
-            updateGallery(); 
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                state.searchQuery = e.target.value; 
+                state.displayLimit = 30; 
+                document.getElementById('gallery-container').scrollTop = 0;
+                updateGallery(); 
+            }, 300);
         });
 
         window.toggleFilter = (type, value) => {
             const current = state.filters[type];
             if (current.includes(value)) state.filters[type] = current.filter(item => item !== value);
             else state.filters[type].push(value);
-            state.displayLimit = 30; // 重置
+            state.displayLimit = 30; document.getElementById('gallery-container').scrollTop = 0;
             updateFilters(); updateGallery();
         };
 
         window.clearFilters = () => {
             state.filters = { content: [], year: [], issue: [], locationCity: [], locationDist: [] };
             state.searchQuery = ''; document.getElementById('searchInput').value = '';
-            state.displayLimit = 30; // 重置
+            state.displayLimit = 30; document.getElementById('gallery-container').scrollTop = 0;
             updateFilters(); updateGallery();
         };
 
@@ -794,7 +805,6 @@
             if (state.tagModal.isOpen) setTimeout(() => document.getElementById('newTagInput')?.focus(), 10);
         }
 
-        // 綁定編輯與彈出視窗行為
         function updateModals() {
             const batchModal = document.getElementById('batch-modal-content');
             const editModal = document.getElementById('edit-modal-content');
@@ -843,20 +853,58 @@
             }
         };
 
+        // ★★★ 安全修改：支援批次文件交易與本地快顯 ★★★
         window.savePhotoEdit = async () => {
             if (!state.user || !state.editModal.photo) return;
             const photo = state.editModal.photo;
             const tags = [photo.locationCity, photo.locationDist, photo.content, photo.year, photo.issue].filter(Boolean);
             const finalTitle = [...tags, photo.customText || ''].filter(Boolean).join('-') || '未命名圖片';
             
+            const updatedFields = {
+                title: finalTitle, 
+                customText: photo.customText || '', 
+                content: photo.content || '', 
+                year: photo.year || '', 
+                issue: photo.issue || '', 
+                locationCity: photo.locationCity || '', 
+                locationDist: photo.locationDist || ''
+            };
+
             try {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'photos', photo.id), { 
-                    title: finalTitle, customText: photo.customText || '', content: photo.content || '', 
-                    year: photo.year || '', issue: photo.issue || '', locationCity: photo.locationCity || '', locationDist: photo.locationDist || ''
-                }, { merge: true });
+                if (photo._isBatch) {
+                    // 使用 Transaction 確保修改陣列時不會發生覆蓋衝突
+                    const batchRef = doc(db, 'artifacts', appId, 'public', 'data', 'photo_batches', photo.batchId);
+                    await runTransaction(db, async (transaction) => {
+                        const batchDoc = await transaction.get(batchRef);
+                        if (!batchDoc.exists()) throw "文件遺失";
+                        
+                        const items = batchDoc.data().items || [];
+                        const itemIndex = items.findIndex(i => i.id === photo.id);
+                        
+                        if (itemIndex > -1) {
+                            items[itemIndex] = { ...items[itemIndex], ...updatedFields };
+                            transaction.update(batchRef, { items });
+                        }
+                    });
+                } else {
+                    // 舊版單張格式更新
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'photos', photo.id), updatedFields, { merge: true });
+                }
+                
                 window.closeEditModal();
-                window.loadPhotos(); // 編輯後重刷資料
-            } catch (err) { console.error(err); alert("儲存失敗"); }
+                
+                // 本地直接突變，不重新拉取幾萬筆資料庫，極致提升體驗
+                const localIndex = state.photos.findIndex(p => p.id === photo.id);
+                if(localIndex > -1) {
+                    state.photos[localIndex] = { ...state.photos[localIndex], ...updatedFields };
+                }
+                updateGallery();
+                updateMoodBoard(); 
+                
+            } catch (err) { 
+                console.error(err); 
+                alert("儲存失敗，請重試"); 
+            }
         };
 
         window.updateNewTagValue = (val) => { state.newTagValue = val; };
@@ -898,20 +946,50 @@
             }; updateModals();
         };
 
+        // ★★★ 安全刪除：支援批次文件交易與本地快顯 ★★★
         window.handleDeletePhoto = (id) => {
             if (!state.user) return;
+            const photo = state.photos.find(p => p.id === id);
+            if(!photo) return;
+
             state.confirmDialog = {
                 isOpen: true, message: "確定刪除這張照片？", isPrimary: false,
                 action: async () => {
                     try {
-                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'photos', id));
+                        if (photo._isBatch) {
+                            const batchRef = doc(db, 'artifacts', appId, 'public', 'data', 'photo_batches', photo.batchId);
+                            await runTransaction(db, async (transaction) => {
+                                const batchDoc = await transaction.get(batchRef);
+                                if (batchDoc.exists()) {
+                                    const items = batchDoc.data().items || [];
+                                    const newItems = items.filter(i => i.id !== photo.id);
+                                    
+                                    if (newItems.length === 0) {
+                                        transaction.delete(batchRef); // 陣列空了順便把文件刪掉
+                                    } else {
+                                        transaction.update(batchRef, { items: newItems });
+                                    }
+                                }
+                            });
+                        } else {
+                            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'photos', id));
+                        }
+                        
+                        // 本地更新狀態
+                        state.photos = state.photos.filter(p => p.id !== id);
                         state.moodBoard = state.moodBoard.filter(p => p.id !== id); 
                         window.closeEditModal(); 
-                        window.loadPhotos(); // 刪除後重刷
-                    } catch (e) { console.error(e); }
+                        updateGallery();
+                        updateMoodBoard();
+                        
+                    } catch (e) { 
+                        console.error(e); 
+                        alert("刪除失敗");
+                    }
                     window.closeConfirmDialog();
                 }
-            }; updateModals();
+            }; 
+            updateModals();
         };
 
         window.closeConfirmDialog = () => { state.confirmDialog = { isOpen: false, message: '', action: null, isPrimary: false }; updateModals(); };
@@ -929,7 +1007,6 @@
             }; r.onerror = rej;
         });
 
-        // 呼叫 Gemini AI 進行視覺辨識 (強制使用最新的 gemini-3.6-flash)
         async function analyzeImageWithGemini(base64Image, categories, apiKey) {
             const prompt = `請分析照片內容，並從給定選項中選擇分類，回傳 JSON：
             - content: 從 ${JSON.stringify(categories.content)} 中挑選一個，無則留空。
@@ -939,25 +1016,15 @@
             - locationDist: 根據所選城市自行判斷適合的區域，無則留空。
             - customText: 10字以內的繁體中文精準短描述。`;
 
-            // 移除 Base64 的標頭，Gemini 只吃純編碼
             const pureBase64 = base64Image.split(',')[1];
-            
-            // 強制綁定官方最新穩定版模型
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
             const response = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: prompt },
-                            { inlineData: { mimeType: "image/jpeg", data: pureBase64 } }
-                        ]
-                    }],
-                    generationConfig: {
-                        responseMimeType: "application/json"
-                    }
+                    contents: [{ parts: [ { text: prompt }, { inlineData: { mimeType: "image/jpeg", data: pureBase64 } } ] }],
+                    generationConfig: { responseMimeType: "application/json" }
                 })
             });
 
@@ -965,10 +1032,8 @@
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.error?.message || "API 請求失敗");
             }
-
             const data = await response.json();
-            const textResponse = data.candidates[0].content.parts[0].text;
-            return JSON.parse(textResponse);
+            return JSON.parse(data.candidates[0].content.parts[0].text);
         }
 
         window.handleBatchUpload = async (e) => {
@@ -978,9 +1043,7 @@
             let apiKey = sessionStorage.getItem('gemini_api_key');
             if (!apiKey) {
                 apiKey = prompt("請輸入您的 Google Gemini API Key (AIza...)：\n(僅暫存於本次瀏覽)");
-                if (!apiKey) {
-                    alert("未提供 API Key，取消上傳。"); e.target.value = null; return;
-                }
+                if (!apiKey) { alert("未提供 API Key，取消上傳。"); e.target.value = null; return; }
                 sessionStorage.setItem('gemini_api_key', apiKey);
             }
 
@@ -989,20 +1052,16 @@
             updateModals();
 
             try {
-                // 1. 先將所有圖片壓縮轉換為 Base64 並建立初始列表
                 state.uploadBatch = await Promise.all(files.map(async (file, i) => ({
                     id: `batch-${Date.now()}-${i}`, url: await compressImage(file), originalName: file.name,
                     suggestions: { customText: 'Gemini 解析中...', content: '', year: '', issue: '', locationCity: '', locationDist: '' }
                 }))); 
                 updateModals();
 
-                // 2. ★排隊循序處理，並加入友善的錯誤攔截★
                 for (let i = 0; i < state.uploadBatch.length; i++) {
                     let item = state.uploadBatch[i];
                     try {
                         const aiResult = await analyzeImageWithGemini(item.url, state.categories, apiKey);
-                        
-                        // 更新單筆照片的解析結果
                         item.suggestions = {
                             customText: aiResult.customText || item.originalName.replace(/\.[^/.]+$/, "").substring(0, 10),
                             content: aiResult.content || '', year: aiResult.year || '', issue: aiResult.issue || '',
@@ -1010,33 +1069,22 @@
                         };
                     } catch (err) {
                         console.error(`圖片 [${item.originalName}] 解析失敗:`, err);
-                        
                         item.suggestions = {
                             customText: item.originalName.replace(/\.[^/.]+$/, "").substring(0, 10),
                             content: '', year: '', issue: '', locationCity: '', locationDist: ''
                         };
 
-                        // 💡 如果發現是被限速了 (包含 Quota 字眼)，跳出一次溫馨警告，並停止後續的 AI 請求
                         if (err.message.toLowerCase().includes('quota') || err.message.toLowerCase().includes('429')) {
-                            alert(`🚨 觸發了 Google API 的每分鐘 20 張額度保護！\n您只需等待約 15 秒即可重新使用 AI。\n\n本次剩下的照片已暫停 AI 解析，系統會先以「原檔名」帶入，您依然可以手動編輯後確認收錄。`);
-                            
-                            // 將剩下的狀態都改為未解析原名，避免卡在「解析中」
+                            alert(`🚨 觸發了 Google API 的限流保護！\n\n本次剩下的照片已暫停 AI 解析，系統會先以「原檔名」帶入，您依然可以手動編輯後確認收錄。`);
                             for (let j = i + 1; j < state.uploadBatch.length; j++) {
                                 state.uploadBatch[j].suggestions.customText = state.uploadBatch[j].originalName.replace(/\.[^/.]+$/, "").substring(0, 10);
                             }
-                            break; // 提早結束 AI 解析迴圈
+                            break; 
                         }
                     }
-                    
-                    // 每解析完一張就更新一次畫面 (使用者能看到進度感)
                     updateModals();
-
-                    // 強制休息 2 秒鐘
-                    if (i < state.uploadBatch.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 2000));
-                    }
+                    if (i < state.uploadBatch.length - 1) await new Promise(resolve => setTimeout(resolve, 2000));
                 }
-
                 state.batchStatus = 'review'; 
                 updateModals();
 
@@ -1062,22 +1110,47 @@
         
         window.closeBatchModal = () => { state.isBatchModalOpen = false; updateModals(); setTimeout(()=>{state.batchStatus='idle';state.uploadBatch=[];}, 300); };
 
+        // ★★★ 上傳批次儲存：1個上傳批次 = 只存成 1 個資料庫文件 ★★★
         window.handleSaveBatch = async () => {
-            if (!state.user) return; state.batchStatus = 'saving'; updateModals();
+            if (!state.user) return; 
+            state.batchStatus = 'saving'; 
+            updateModals();
+            
             try {
-                const pRef = collection(db, 'artifacts', appId, 'public', 'data', 'photos');
-                for (const item of state.uploadBatch) {
+                // 將畫面上這批幾十張的照片，打包成一個獨立的陣列
+                const itemsToSave = state.uploadBatch.map(item => {
                     const s = item.suggestions;
                     const tags = [s.locationCity, s.locationDist, s.content, s.year, s.issue].filter(Boolean);
                     let finalTitle = [...tags, s.customText || ''].filter(Boolean).join('-');
-                    await addDoc(pRef, { 
-                        url: item.url, title: finalTitle || '未命名', customText: s.customText || '',
-                        content: s.content||'', year: s.year||'', issue: s.issue||'', locationCity: s.locationCity||'', locationDist: s.locationDist||'', createdAt: Date.now() 
-                    });
-                }
+                    
+                    return {
+                        id: 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
+                        url: item.url, 
+                        title: finalTitle || '未命名', 
+                        customText: s.customText || '',
+                        content: s.content || '', 
+                        year: s.year || '', 
+                        issue: s.issue || '', 
+                        locationCity: s.locationCity || '', 
+                        locationDist: s.locationDist || '', 
+                        createdAt: Date.now() 
+                    };
+                });
+
+                // 一次性寫入！(將陣列存入 photo_batches 集合中)
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'photo_batches'), { 
+                    items: itemsToSave,
+                    createdAt: Date.now()
+                });
+                
                 window.closeBatchModal();
-                window.loadPhotos(); // 儲存完畢重刷資料庫
-            } catch (e) { state.batchStatus = 'review'; updateModals(); }
+                window.loadPhotos(); // 儲存完畢重新拉取資料庫
+            } catch (e) { 
+                console.error("Save batch error:", e);
+                state.batchStatus = 'review'; 
+                updateModals(); 
+                alert("儲存失敗，請重試");
+            }
         };
 
         lucide.createIcons(); 
