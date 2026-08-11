@@ -165,6 +165,10 @@
         let loadMoreObserver = null;
         let searchTimeout = null;
 
+        // 補上這兩個核心的 UI 畫面更新函數
+        function updateGallery() { renderGallery(); }
+        function updateMoodBoard() { renderMoodBoard(); }
+
         // === STREAMING_CHUNK:Authentication and Initial Data Load... ===
         window.handleLogin = async (e) => {
             e.preventDefault();
@@ -234,6 +238,12 @@
                 state.photos = [...batchPhotos, ...legacyPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
             } catch (error) {
                 console.error("Load photos error:", error);
+                // 加入讀取失敗的 UI 提示，方便未來除錯
+                const container = document.getElementById('gallery-container');
+                if (container) {
+                    container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-rose-500 py-10 animate-fadeIn"><i data-lucide="shield-alert" class="w-12 h-12 mb-4"></i><p class="font-bold">讀取圖庫失敗，請檢查資料庫權限或網路連線</p><p class="text-xs mt-2 opacity-80">${error.message}</p></div>`;
+                    lucide.createIcons({ root: container });
+                }
             } finally {
                 state.isLoading = false;
                 updateGallery();
@@ -753,11 +763,108 @@
             </div>`;
         }
 
+        // 新增：將批次項目的表單獨立出來，方便進行無閃爍的局部更新
+        function renderBatchItemForm(item) {
+            const cityOpts = Object.keys(state.categories.locationHierarchy);
+            const distOpts = item.suggestions.locationCity ? state.categories.locationHierarchy[item.suggestions.locationCity] : [];
+            
+            return `
+                <div class="flex flex-col gap-2 mb-5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[11px] uppercase tracking-wider font-bold text-slate-400 flex items-center gap-1.5"><i data-lucide="type" class="w-3.5 h-3.5"></i> 照片短描述</label>
+                        <button onclick="window.removeBatchItem('${item.id}')" class="text-slate-400 hover:text-rose-500 bg-slate-50 hover:bg-rose-50 p-1.5 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                    <div class="flex bg-slate-50 border border-slate-200 rounded-xl p-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
+                        <input type="text" value="${item.suggestions.customText || ''}" oninput="window.updateBatchItemCustomText('${item.id}', this.value)" placeholder="AI 產生中..." class="font-bold text-slate-900 bg-transparent outline-none px-3 py-2 w-full min-w-0 placeholder-slate-400" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5 p-4 bg-emerald-50/40 rounded-xl border border-emerald-100">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-[10px] uppercase tracking-wider font-bold text-slate-500">國家/縣市</label>
+                            <button onclick="window.openAddTagModal('locationCity')" class="text-emerald-500 hover:text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md" title="新增國家/縣市"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                        </div>
+                        ${createPillGroup('updateBatchItem', item.id, 'locationCity', cityOpts, item.suggestions.locationCity, 'bg-emerald-100 border-emerald-300 text-emerald-800')}
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-[10px] uppercase tracking-wider font-bold text-slate-500">鄉鎮市區</label>
+                            ${item.suggestions.locationCity ? `<button onclick="window.openAddTagModal('locationDist', '${item.suggestions.locationCity}')" class="text-emerald-500 hover:text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md" title="在此新增"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
+                        </div>
+                        ${item.suggestions.locationCity ? (distOpts.length > 0 ? createPillGroup('updateBatchItem', item.id, 'locationDist', distOpts, item.suggestions.locationDist, 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-2">無子區域選項，請按上方 + 號新增</p>') : '<p class="text-[11px] font-bold text-slate-400 py-2">請先選擇左側縣市</p>'}
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">內容分類</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        ${createPillGroup('updateBatchItem', item.id, 'content', state.categories.content, item.suggestions.content, 'bg-blue-100 border-blue-300 text-blue-800')}
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">歸檔年份</label><button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        ${createPillGroup('updateBatchItem', item.id, 'year', state.categories.year, item.suggestions.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">雜誌期數</label><button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        ${createPillGroup('updateBatchItem', item.id, 'issue', state.categories.issue, item.suggestions.issue, 'bg-violet-100 border-violet-300 text-violet-800')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 新增：將單張編輯的表單獨立出來
+        function renderEditModalForm(photo) {
+            const cityOpts = Object.keys(state.categories.locationHierarchy);
+            const distOpts = photo.locationCity ? state.categories.locationHierarchy[photo.locationCity] : [];
+            
+            return `
+                <div class="flex flex-col gap-2 mb-2">
+                    <label class="text-[11px] uppercase tracking-wider font-bold text-slate-500 flex items-center gap-1.5"><i data-lucide="type" class="w-3.5 h-3.5"></i> 照片短描述</label>
+                    <div class="flex bg-white border border-slate-200 rounded-xl p-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all shadow-sm">
+                        <input type="text" value="${photo.customText || ''}" oninput="window.updateEditModalCustomText(this.value)" placeholder="輸入自訂短描述..." class="font-bold text-slate-900 bg-transparent outline-none px-3 py-2 w-full min-w-0" />
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 shadow-sm">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">國家 / 縣市</label>
+                            <button onclick="window.openAddTagModal('locationCity')" class="text-emerald-500 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                        </div>
+                        ${createPillGroup('updateEditModalField', null, 'locationCity', cityOpts, photo.locationCity, 'bg-emerald-100 border-emerald-300 text-emerald-800')}
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">鄉鎮市區</label>
+                            ${photo.locationCity ? `<button onclick="window.openAddTagModal('locationDist', '${photo.locationCity}')" class="text-emerald-500 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
+                        </div>
+                        ${photo.locationCity ? (distOpts.length > 0 ? createPillGroup('updateEditModalField', null, 'locationDist', distOpts, photo.locationDist, 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選縣市</p>'}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">內容分類</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        ${createPillGroup('updateEditModalField', null, 'content', state.categories.content, photo.content, 'bg-blue-100 border-blue-300 text-blue-800')}
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">發行年份</label><button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        ${createPillGroup('updateEditModalField', null, 'year', state.categories.year, photo.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">雜誌期數</label><button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        ${createPillGroup('updateEditModalField', null, 'issue', state.categories.issue, photo.issue, 'bg-violet-100 border-violet-300 text-violet-800')}
+                    </div>
+                </div>
+            `;
+        }
+
         function renderModals() {
             const container = document.getElementById('modals-container');
             let html = '';
 
-            // AI 批次上傳彈窗 (保持不變的強大佈局)
+            // AI 批次上傳彈窗
             if (state.isBatchModalOpen) {
                 html += `
                 <div class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 md:p-8">
@@ -773,62 +880,17 @@
                             ${state.batchStatus === 'analyzing' ? `<div class="flex items-center gap-2 text-blue-700 bg-blue-100 px-4 py-2 rounded-xl text-sm font-bold shadow-sm"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> AI 解析中...</div>` : ''}
                         </div>
                         <div id="batch-modal-content" class="flex-1 overflow-y-auto bg-slate-100/50 p-4 md:p-6 space-y-4 custom-scrollbar">
-                            ${state.uploadBatch.map((item, index) => {
-                                const cityOpts = Object.keys(state.categories.locationHierarchy);
-                                const distOpts = item.suggestions.locationCity ? state.categories.locationHierarchy[item.suggestions.locationCity] : [];
-                                
-                                return `
+                            ${state.uploadBatch.map((item, index) => `
                                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col lg:flex-row gap-6 relative">
                                     <div class="w-full lg:w-56 h-48 lg:h-auto lg:aspect-[4/3] rounded-xl overflow-hidden relative shrink-0 bg-slate-100 border border-slate-100">
                                         <img src="${item.url}" class="w-full h-full object-cover" />
                                         ${state.batchStatus === 'analyzing' ? `<div class="absolute inset-0 bg-blue-900/50 flex items-center justify-center backdrop-blur-[2px]"><div class="absolute top-0 left-0 w-full h-0.5 bg-blue-400 shadow-[0_0_12px_#60a5fa] scan-line" style="animation-delay: ${index * 0.2}s"></div><i data-lucide="cpu" class="w-8 h-8 text-white animate-pulse"></i></div>` : ''}
                                     </div>
-                                    <div class="flex-1 flex flex-col justify-center min-w-0 py-1 ${state.batchStatus === 'analyzing' || state.batchStatus === 'saving' ? 'opacity-50 pointer-events-none' : ''}">
-                                        
-                                        <div class="flex flex-col gap-2 mb-5">
-                                            <div class="flex items-center justify-between">
-                                                <label class="text-[11px] uppercase tracking-wider font-bold text-slate-400 flex items-center gap-1.5"><i data-lucide="type" class="w-3.5 h-3.5"></i> 照片短描述</label>
-                                                <button onclick="window.removeBatchItem('${item.id}')" class="text-slate-400 hover:text-rose-500 bg-slate-50 hover:bg-rose-50 p-1.5 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                            </div>
-                                            <div class="flex bg-slate-50 border border-slate-200 rounded-xl p-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
-                                                <input type="text" value="${item.suggestions.customText || ''}" oninput="window.updateBatchItemCustomText('${item.id}', this.value)" placeholder="AI 產生中..." class="font-bold text-slate-900 bg-transparent outline-none px-3 py-2 w-full min-w-0 placeholder-slate-400" />
-                                            </div>
-                                        </div>
-
-                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5 p-4 bg-emerald-50/40 rounded-xl border border-emerald-100">
-                                            <div>
-                                                <div class="flex items-center justify-between mb-2">
-                                                    <label class="text-[10px] uppercase tracking-wider font-bold text-slate-500">國家/縣市</label>
-                                                    <button onclick="window.openAddTagModal('locationCity')" class="text-emerald-500 hover:text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md" title="新增國家/縣市"><i data-lucide="plus" class="w-3 h-3"></i></button>
-                                                </div>
-                                                ${createPillGroup('updateBatchItem', item.id, 'locationCity', cityOpts, item.suggestions.locationCity, 'bg-emerald-100 border-emerald-300 text-emerald-800')}
-                                            </div>
-                                            <div>
-                                                <div class="flex items-center justify-between mb-2">
-                                                    <label class="text-[10px] uppercase tracking-wider font-bold text-slate-500">鄉鎮市區</label>
-                                                    ${item.suggestions.locationCity ? `<button onclick="window.openAddTagModal('locationDist', '${item.suggestions.locationCity}')" class="text-emerald-500 hover:text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md" title="在此新增"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
-                                                </div>
-                                                ${item.suggestions.locationCity ? (distOpts.length > 0 ? createPillGroup('updateBatchItem', item.id, 'locationDist', distOpts, item.suggestions.locationDist, 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-2">無子區域選項，請按上方 + 號新增</p>') : '<p class="text-[11px] font-bold text-slate-400 py-2">請先選擇左側縣市</p>'}
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                            <div>
-                                                <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">內容分類</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
-                                                ${createPillGroup('updateBatchItem', item.id, 'content', state.categories.content, item.suggestions.content, 'bg-blue-100 border-blue-300 text-blue-800')}
-                                            </div>
-                                            <div>
-                                                <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">歸檔年份</label><button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
-                                                ${createPillGroup('updateBatchItem', item.id, 'year', state.categories.year, item.suggestions.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
-                                            </div>
-                                            <div>
-                                                <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">雜誌期數</label><button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
-                                                ${createPillGroup('updateBatchItem', item.id, 'issue', state.categories.issue, item.suggestions.issue, 'bg-violet-100 border-violet-300 text-violet-800')}
-                                            </div>
-                                        </div>
+                                    <div id="batch-item-form-${item.id}" class="flex-1 flex flex-col justify-center min-w-0 py-1 ${state.batchStatus === 'analyzing' || state.batchStatus === 'saving' ? 'opacity-50 pointer-events-none' : ''}">
+                                        ${renderBatchItemForm(item)}
                                     </div>
-                                </div>`;
-                            }).join('')}
+                                </div>
+                            `).join('')}
                         </div>
                         <div class="px-6 py-5 border-t border-slate-200 bg-white flex justify-between items-center shrink-0">
                             <button onclick="window.closeBatchModal()" ${state.batchStatus === 'saving' ? 'disabled' : ''} class="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-all text-sm disabled:opacity-50">取消</button>
@@ -843,8 +905,6 @@
             // 單張編輯彈窗
             if (state.editModal.isOpen && state.editModal.photo) {
                 const photo = state.editModal.photo;
-                const cityOpts = Object.keys(state.categories.locationHierarchy);
-                const distOpts = photo.locationCity ? state.categories.locationHierarchy[photo.locationCity] : [];
                 
                 html += `
                 <div class="fixed inset-0 z-[105] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6">
@@ -854,48 +914,11 @@
                             <h3 class="font-extrabold text-slate-900 text-lg">編輯照片屬性</h3>
                         </div>
                         <div id="edit-modal-content" class="p-6 overflow-y-auto space-y-6 custom-scrollbar bg-slate-50/50">
-                            
-                            <div class="flex flex-col gap-2 mb-2">
-                                <label class="text-[11px] uppercase tracking-wider font-bold text-slate-500 flex items-center gap-1.5"><i data-lucide="type" class="w-3.5 h-3.5"></i> 照片短描述</label>
-                                <div class="flex bg-white border border-slate-200 rounded-xl p-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all shadow-sm">
-                                    <input type="text" value="${photo.customText || ''}" oninput="window.updateEditModalCustomText(this.value)" placeholder="輸入自訂短描述..." class="font-bold text-slate-900 bg-transparent outline-none px-3 py-2 w-full min-w-0" />
-                                </div>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 shadow-sm">
-                                <div>
-                                    <div class="flex items-center justify-between mb-3">
-                                        <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">國家 / 縣市</label>
-                                        <button onclick="window.openAddTagModal('locationCity')" class="text-emerald-500 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>
-                                    </div>
-                                    ${createPillGroup('updateEditModalField', null, 'locationCity', cityOpts, photo.locationCity, 'bg-emerald-100 border-emerald-300 text-emerald-800')}
-                                </div>
-                                <div>
-                                    <div class="flex items-center justify-between mb-3">
-                                        <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">鄉鎮市區</label>
-                                        ${photo.locationCity ? `<button onclick="window.openAddTagModal('locationDist', '${photo.locationCity}')" class="text-emerald-500 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
-                                    </div>
-                                    ${photo.locationCity ? (distOpts.length > 0 ? createPillGroup('updateEditModalField', null, 'locationDist', distOpts, photo.locationDist, 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選縣市</p>'}
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                    <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">內容分類</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
-                                    ${createPillGroup('updateEditModalField', null, 'content', state.categories.content, photo.content, 'bg-blue-100 border-blue-300 text-blue-800')}
-                                </div>
-                                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                    <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">發行年份</label><button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
-                                    ${createPillGroup('updateEditModalField', null, 'year', state.categories.year, photo.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
-                                </div>
-                                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                    <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">雜誌期數</label><button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
-                                    ${createPillGroup('updateEditModalField', null, 'issue', state.categories.issue, photo.issue, 'bg-violet-100 border-violet-300 text-violet-800')}
-                                </div>
+                            <div id="edit-photo-form">
+                                ${renderEditModalForm(photo)}
                             </div>
                         </div>
                         <div class="px-6 py-5 border-t border-slate-100 bg-white flex justify-between items-center shrink-0">
-                            <!-- 移除了單張刪除，統一由批次刪除處理以保持 UI 邏輯一致，若要保留也可直接調用原本邏輯 -->
                             <div></div> 
                             <div class="flex gap-3">
                                 <button onclick="window.closeEditModal()" class="px-5 py-2.5 text-sm text-slate-500 hover:bg-slate-100 rounded-xl transition-all font-bold">取消</button>
@@ -985,11 +1008,18 @@
         
         window.closeEditModal = () => { state.editModal = { isOpen: false, photo: null }; updateModals(); };
         window.updateEditModalCustomText = (val) => { if (state.editModal.photo) state.editModal.photo.customText = val; };
+        
+        // 修改：使用精準 DOM 更新替換局部表單，不再重繪整個 Modal 避免閃爍
         window.updateEditModalField = (field, value) => {
             if (state.editModal.photo) {
                 state.editModal.photo[field] = value;
                 if(field === 'locationCity' && state.editModal.photo.locationDist) state.editModal.photo.locationDist = '';
-                updateModals();
+                
+                const formEl = document.getElementById('edit-photo-form');
+                if (formEl) {
+                    formEl.innerHTML = renderEditModalForm(state.editModal.photo);
+                    lucide.createIcons({ root: formEl });
+                }
             }
         };
 
@@ -1139,7 +1169,22 @@
         };
 
         window.updateBatchItemCustomText = (id, val) => { const i = state.uploadBatch.find(x=>x.id===id); if(i) i.suggestions.customText = val; };
-        window.updateBatchItem = (id, fld, val) => { const i = state.uploadBatch.find(x=>x.id===id); if(i) { i.suggestions[fld] = val; if(fld === 'locationCity' && i.suggestions.locationDist) i.suggestions.locationDist = ''; } updateModals(); };
+        
+        // 修改：使用精準 DOM 更新替換該項目的局部表單，不再重繪整個 Modal 避免圖片與滾動條閃爍
+        window.updateBatchItem = (id, fld, val) => { 
+            const i = state.uploadBatch.find(x=>x.id===id); 
+            if(i) { 
+                i.suggestions[fld] = val; 
+                if(fld === 'locationCity' && i.suggestions.locationDist) i.suggestions.locationDist = ''; 
+                
+                const formEl = document.getElementById(`batch-item-form-${id}`);
+                if (formEl) {
+                    formEl.innerHTML = renderBatchItemForm(i);
+                    lucide.createIcons({ root: formEl });
+                }
+            } 
+        };
+        
         window.removeBatchItem = (id) => { state.uploadBatch = state.uploadBatch.filter(i=>i.id!==id); if(!state.uploadBatch.length) window.closeBatchModal(); else updateModals(); };
         window.closeBatchModal = () => { state.isBatchModalOpen = false; updateModals(); setTimeout(()=>{state.batchStatus='idle';state.uploadBatch=[];}, 300); };
 
