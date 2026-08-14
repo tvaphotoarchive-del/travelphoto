@@ -29,15 +29,14 @@
 </head>
 <body class="bg-slate-50 font-sans text-slate-800 antialiased selection:bg-blue-200 selection:text-blue-900">
 
-    <!-- === STREAMING_CHUNK:Building the Login Screen... === -->
     <div id="login-screen" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-lg transition-opacity duration-500 px-4">
         <div class="bg-white/90 backdrop-blur-xl rounded-3xl p-8 w-full max-w-sm shadow-2xl transform transition-all animate-popIn text-center border border-white/40">
             <!-- 替換為台灣觀光協會 Logo -->
             <div class="h-24 flex items-center justify-center mx-auto mb-4 transform hover:scale-105 transition-transform">
-                <img src="image_baefbd.png" alt="台灣觀光協會 TVA Logo" class="h-full object-contain drop-shadow-sm" />
+                <img src="image_baefbd.png" alt="台灣觀光協會 TVA Logo" class="h-full object-contain drop-shadow-sm" onerror="this.src='https://placehold.co/200x80/ffffff/333333?text=TravelLens'" />
             </div>
             <h2 class="text-3xl font-extrabold tracking-tight text-slate-900 mb-2">TravelLens</h2>
-            <p class="text-sm text-slate-500 mb-8 font-medium">TVA照片資產管理系統</p>
+            <p class="text-sm text-slate-500 mb-8 font-medium">旅遊視覺資產管理系統</p>
             <form onsubmit="window.handleLogin(event)">
                 <div class="space-y-4 mb-6">
                     <input type="email" id="email-input" placeholder="登入信箱 (Email)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-center tracking-wider font-medium placeholder-slate-400 shadow-sm" required autofocus />
@@ -51,15 +50,13 @@
         </div>
     </div>
 
-    <!-- === STREAMING_CHUNK:Laying out the Main Application Grid... === -->
     <div class="flex flex-col md:flex-row h-screen relative hidden overflow-hidden" id="app">
         
         <!-- 1. 左側過濾面板 -->
         <aside class="w-full md:w-72 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 z-20 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] relative">
             <div class="p-6 border-b border-slate-100 shrink-0 bg-white/80 backdrop-blur-md">
-                <!-- 在標題旁加入縮小的 TVA Logo -->
                 <div class="flex items-center gap-3 mb-1">
-                    <img src="image_baefbd.png" alt="TVA" class="h-8 w-auto object-contain" />
+                    <img src="image_baefbd.png" alt="TVA" class="h-8 w-auto object-contain" onerror="this.style.display='none'" />
                     <h1 class="text-2xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
                         TravelLens
                     </h1>
@@ -113,7 +110,6 @@
     <!-- Modals Container -->
     <div id="modals-container"></div>
 
-    <!-- === STREAMING_CHUNK:Initializing Firebase and Core State... === -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
@@ -140,6 +136,7 @@
                 content: ['景點與娛樂', '餐飲與美食', '住宿與交通', '自然與人文'], 
                 year: ['2026', '2027', '2028'],
                 issue: ['Vol.12', 'Vol.13', 'Vol.14'],
+                remarks: ['空拍', '夜景', '人像', '特殊企劃'], // 新增相關備註分類預設值
                 locationHierarchy: {
                     '台灣-花蓮': ['花蓮市', '吉安鄉', '秀林鄉'],
                     '台灣-墾丁': ['恆春鎮'],
@@ -149,10 +146,9 @@
                 }
             },
             searchQuery: '',
-            filters: { content: [], year: [], issue: [], locationCity: [], locationDist: [] },
+            filters: { content: [], year: [], issue: [], remarks: [], locationCity: [], locationDist: [] }, // 新增 remarks 篩選狀態
             moodBoard: [],
             
-            // 多選批次刪除狀態
             isSelectionMode: false,
             selectedIds: new Set(),
             
@@ -170,11 +166,9 @@
         let loadMoreObserver = null;
         let searchTimeout = null;
 
-        // 補上這兩個核心的 UI 畫面更新函數
         function updateGallery() { renderGallery(); }
         function updateMoodBoard() { renderMoodBoard(); }
 
-        // === STREAMING_CHUNK:Authentication and Initial Data Load... ===
         window.handleLogin = async (e) => {
             e.preventDefault();
             const email = document.getElementById('email-input').value;
@@ -211,6 +205,8 @@
                 unsubTags = onSnapshot(tagsRef, (docSnap) => {
                     if (docSnap.exists()) { 
                         state.categories = { ...state.categories, ...docSnap.data() }; 
+                        // 確保如果舊資料庫沒有 remarks，至少補上空陣列
+                        if (!state.categories.remarks) state.categories.remarks = [];
                         updateFilters(); 
                         updateModals(); 
                     }
@@ -226,7 +222,6 @@
 
             try {
                 let batchPhotos = []; let legacyPhotos = [];
-                // 1. 讀取批次陣列 (巨量資料最佳化)
                 const batchRef = collection(db, 'artifacts', appId, 'public', 'data', 'photo_batches');
                 const batchSnap = await getDocs(batchRef);
                 batchSnap.forEach(docSnap => {
@@ -235,7 +230,6 @@
                         data.items.forEach(item => batchPhotos.push({ ...item, batchId: docSnap.id, _isBatch: true }));
                     }
                 });
-                // 2. 讀取舊單張 (防爆限制)
                 const legacyRef = collection(db, 'artifacts', appId, 'public', 'data', 'photos');
                 const oldSnap = await getDocs(query(legacyRef, orderBy('createdAt', 'desc'), limit(1000)));
                 oldSnap.forEach(docSnap => legacyPhotos.push({ id: docSnap.id, ...docSnap.data(), _isBatch: false }));
@@ -243,7 +237,6 @@
                 state.photos = [...batchPhotos, ...legacyPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
             } catch (error) {
                 console.error("Load photos error:", error);
-                // 加入讀取失敗的 UI 提示，方便未來除錯
                 const container = document.getElementById('gallery-container');
                 if (container) {
                     container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-rose-500 py-10 animate-fadeIn"><i data-lucide="shield-alert" class="w-12 h-12 mb-4"></i><p class="font-bold">讀取圖庫失敗，請檢查資料庫權限或網路連線</p><p class="text-xs mt-2 opacity-80">${error.message}</p></div>`;
@@ -262,9 +255,7 @@
             else el.innerHTML = `<span class="flex items-center text-rose-500 uppercase"><div class="w-1.5 h-1.5 bg-rose-500 rounded-full mr-1.5"></div> 連線中...</span>`;
         }
 
-        // === STREAMING_CHUNK:Rendering Smart Filters (Zero Flash)... ===
         function updateFilters() {
-            // 為了不讓使用者點擊分類時捲軸亂跳，先記錄目前的開啟狀態與捲軸位置
             const detailsStates = {};
             document.querySelectorAll('details.loc-group').forEach(el => {
                 if (el.dataset.city) detailsStates[el.dataset.city] = el.open;
@@ -277,8 +268,9 @@
             html += renderFilterSection('content', '內容與體驗', 'bookmark', 'blue', state.categories.content);
             html += renderFilterSection('year', '發行年份', 'calendar', 'indigo', state.categories.year);
             html += renderFilterSection('issue', '雜誌期數', 'book-open', 'violet', state.categories.issue);
+            // 新增相關備註的過濾器
+            html += renderFilterSection('remarks', '相關備註', 'tag', 'amber', state.categories.remarks || []);
             
-            // 地理位置巢狀渲染
             html += `
             <div class="mb-2">
                 <h3 class="text-[11px] font-bold tracking-widest text-slate-400 mb-3 flex items-center justify-between uppercase">
@@ -336,7 +328,6 @@
             container.innerHTML = html;
             lucide.createIcons();
             
-            // 恢復滾動位置，防止畫面跳動
             requestAnimationFrame(() => { container.scrollTop = scrollTop; });
         }
 
@@ -367,7 +358,6 @@
             return html;
         }
 
-        // === STREAMING_CHUNK:Interactive Header & Batch Selection Logic... ===
         function renderHeaderActions() {
             const container = document.getElementById('header-actions');
             if (!container) return;
@@ -403,10 +393,9 @@
             state.isSelectionMode = !state.isSelectionMode;
             if (!state.isSelectionMode) state.selectedIds.clear();
             renderHeaderActions();
-            updateGallery(); // 需要完全重新渲染卡片狀態
+            updateGallery();
         };
 
-        // 直接 DOM 操作，解決點擊卡片會閃爍的問題
         window.handlePhotoClick = (id) => {
             if (state.isSelectionMode) {
                 const card = document.getElementById(`card-${id}`);
@@ -420,7 +409,6 @@
                     isSelected = true;
                 }
 
-                // 只更新該卡片的 DOM 樣式，不重新載入圖片
                 if (card) {
                     if (isSelected) {
                         card.classList.add('ring-4', 'ring-blue-500', 'shadow-xl', 'scale-[0.98]');
@@ -439,9 +427,8 @@
             }
         };
 
-        // 直接 DOM 操作企劃板加入按鈕，解決點按鈕會閃爍的問題
         window.toggleMoodBoard = (photoId, event) => {
-            if (event) event.stopPropagation(); // 防止觸發卡片點擊
+            if (event) event.stopPropagation(); 
             const photo = state.photos.find(p => p.id === photoId) || state.moodBoard.find(p => p.id === photoId);
             if (!photo) return;
 
@@ -455,7 +442,6 @@
                 isNowSelected = true;
             }
 
-            // 直接找到對應的按鈕並變更外觀
             const btn = document.getElementById(`mb-btn-${photoId}`);
             if (btn) {
                 if (isNowSelected) {
@@ -467,10 +453,9 @@
                 }
                 lucide.createIcons({ root: btn });
             }
-            updateMoodBoard(); // 更新右側列表
+            updateMoodBoard(); 
         };
 
-        // === STREAMING_CHUNK:Rendering Main Gallery Grid... ===
         function renderGallery() {
             renderHeaderActions();
             const container = document.getElementById('gallery-container');
@@ -484,6 +469,8 @@
                 const matchContent = state.filters.content.length === 0 || state.filters.content.includes(photo.content);
                 const matchYear = state.filters.year.length === 0 || state.filters.year.includes(photo.year);
                 const matchIssue = state.filters.issue.length === 0 || state.filters.issue.includes(photo.issue);
+                // 增加 Remarks 過濾
+                const matchRemarks = state.filters.remarks.length === 0 || (photo.remarks && state.filters.remarks.includes(photo.remarks));
                 
                 let matchLocation = true;
                 if (state.filters.locationCity.length > 0 || state.filters.locationDist.length > 0) {
@@ -491,7 +478,7 @@
                     const distMatch = state.filters.locationDist.includes(`${photo.locationCity}|${photo.locationDist}`);
                     matchLocation = cityMatch || distMatch;
                 }
-                return matchSearch && matchContent && matchYear && matchIssue && matchLocation;
+                return matchSearch && matchContent && matchYear && matchIssue && matchRemarks && matchLocation;
             });
 
             stats.innerHTML = `<i data-lucide="filter" class="w-3.5 h-3.5 text-blue-500"></i> 共 ${state.photos.length} 張 <span class="text-slate-300 mx-1">|</span> 顯示 ${filteredPhotos.length} 張`;
@@ -514,25 +501,19 @@
                 const isSelected = state.selectedIds.has(photo.id);
                 const locDisplay = [photo.locationCity, photo.locationDist].filter(Boolean).join(', ');
                 
-                // 動態決定卡片與圖示的樣式
                 const cardBaseClass = "group relative bg-white rounded-2xl overflow-hidden transition-all duration-300 flex flex-col cursor-pointer";
                 const cardActiveStyle = isSelected ? "ring-4 ring-blue-500 shadow-xl scale-[0.98]" : "border border-slate-200 hover:shadow-xl";
                 
                 html += `
                     <div class="${cardBaseClass} ${cardActiveStyle}" onclick="window.handlePhotoClick('${photo.id}')" id="card-${photo.id}">
-                        <!-- 選取模式覆蓋層 -->
                         <div id="sel-icon-${photo.id}" class="${isSelected ? 'absolute inset-0 bg-blue-500/10 border-[6px] border-blue-500 rounded-2xl z-20 flex items-start justify-start p-3 transition-all' : 'hidden'}">
                             <div class="bg-blue-500 text-white rounded-full p-1 shadow-md"><i data-lucide="check" class="w-5 h-5"></i></div>
                         </div>
 
-                        <!-- 圖片區塊 -->
                         <div class="relative aspect-[4/3] bg-slate-200 overflow-hidden shrink-0">
                             <img src="${photo.url}" loading="lazy" alt="${photo.title}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                            
-                            <!-- 底部漸層，增加文字易讀性 -->
                             <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent pointer-events-none z-10"></div>
                             
-                            <!-- 企劃板按鈕 (選取模式下隱藏) -->
                             ${!state.isSelectionMode ? `
                                 <button id="mb-btn-${photo.id}" onclick="window.toggleMoodBoard('${photo.id}', event)" class="absolute top-3 right-3 p-2.5 rounded-full shadow-lg z-30 transition-all transform hover:scale-110 ${inMoodboard ? 'bg-blue-600 text-white' : 'bg-white/90 backdrop-blur text-slate-700 hover:bg-white'}">
                                     <i data-lucide="${inMoodboard ? 'check' : 'plus'}" class="w-4 h-4"></i>
@@ -542,7 +523,6 @@
                                 </button>
                             ` : ''}
 
-                            <!-- 圖片底部標籤 -->
                             <div class="absolute bottom-3 left-3 flex gap-1.5 z-20">
                                 <span class="px-2 py-1 text-[10px] font-bold tracking-wider uppercase bg-white/20 backdrop-blur-md text-white rounded shadow-sm flex items-center gap-1 border border-white/20">
                                     <i data-lucide="calendar" class="w-3 h-3"></i> ${photo.year || '無年份'} | ${photo.issue || '無期數'}
@@ -550,12 +530,12 @@
                             </div>
                         </div>
 
-                        <!-- 文字資訊區塊 -->
                         <div class="p-4 flex-1 flex flex-col bg-white z-10 relative">
                             <h4 class="font-bold text-slate-900 mb-2 truncate text-sm" title="${photo.title}">${photo.customText || photo.title || '未命名'}</h4>
                             <div class="flex flex-wrap gap-1.5 text-[10px] font-semibold text-slate-500 mt-auto">
                                 ${photo.content ? `<span class="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded text-slate-600"><i data-lucide="bookmark" class="w-3 h-3"></i> ${photo.content}</span>` : ''}
                                 ${locDisplay ? `<span class="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-100"><i data-lucide="map-pin" class="w-3 h-3"></i> ${locDisplay}</span>` : ''}
+                                ${photo.remarks ? `<span class="flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-100"><i data-lucide="tag" class="w-3 h-3"></i> ${photo.remarks}</span>` : ''}
                             </div>
                         </div>
                     </div>`;
@@ -598,13 +578,12 @@
             updateFilters(); updateGallery();
         };
         window.clearFilters = () => {
-            state.filters = { content: [], year: [], issue: [], locationCity: [], locationDist: [] };
+            state.filters = { content: [], year: [], issue: [], remarks: [], locationCity: [], locationDist: [] };
             state.searchQuery = ''; document.getElementById('searchInput').value = '';
             state.displayLimit = 30; document.getElementById('gallery-container').scrollTop = 0;
             updateFilters(); updateGallery();
         };
 
-        // === STREAMING_CHUNK:Batch Deletion Logic... ===
         window.handleBatchDelete = () => {
             if (state.selectedIds.size === 0) return;
             state.confirmDialog = {
@@ -612,7 +591,6 @@
                 message: `確定要刪除這 ${state.selectedIds.size} 張照片嗎？\n(此操作無法復原，並將從所有企劃板中移除)`, 
                 isPrimary: false,
                 action: async () => {
-                    // 將狀態切換為 Loading
                     state.confirmDialog.isLoading = true;
                     updateModals();
                     
@@ -620,7 +598,6 @@
                         const legacyIds = [];
                         const batchGroups = {}; 
                         
-                        // 分類照片來源 (獨立文件 vs 批次陣列)
                         state.selectedIds.forEach(id => {
                             const photo = state.photos.find(p => p.id === id);
                             if (photo) {
@@ -634,9 +611,7 @@
                         });
 
                         const promises = [];
-                        // 1. 刪除獨立照片
                         legacyIds.forEach(id => { promises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'photos', id))); });
-                        // 2. 刪除批次陣列中的特定照片 (透過 Transaction 保障陣列安全)
                         Object.keys(batchGroups).forEach(batchId => {
                             const idsToRemove = batchGroups[batchId];
                             const batchRef = doc(db, 'artifacts', appId, 'public', 'data', 'photo_batches', batchId);
@@ -653,7 +628,6 @@
 
                         await Promise.all(promises);
 
-                        // 更新本地快取，極速反應
                         state.photos = state.photos.filter(p => !state.selectedIds.has(p.id));
                         state.moodBoard = state.moodBoard.filter(p => !state.selectedIds.has(p.id));
                         state.selectedIds.clear();
@@ -670,7 +644,6 @@
             updateModals();
         };
 
-        // === STREAMING_CHUNK:Right Sidebar (Moodboard)... ===
         function renderMoodBoard() {
             const container = document.getElementById('moodboard-items');
             const countEl = document.getElementById('moodboard-count');
@@ -754,7 +727,6 @@
             }; updateModals();
         };
 
-        // === STREAMING_CHUNK:Modals & Utility Functions... ===
         function createPillGroup(onClickFnName, idOrNull, field, options, selectedValue, colorClassActive) {
             return `<div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar pr-1 pb-1">
                 ${options.map(opt => {
@@ -768,13 +740,13 @@
             </div>`;
         }
 
-        // 新增：將批次項目的表單獨立出來，方便進行無閃爍的局部更新
+        // 加入 Remarks (相關備註) 至批次表單，並將排版改為 4 欄
         function renderBatchItemForm(item) {
             const cityOpts = Object.keys(state.categories.locationHierarchy);
             const distOpts = item.suggestions.locationCity ? state.categories.locationHierarchy[item.suggestions.locationCity] : [];
             
             return `
-                <div class="flex flex-col gap-2 mb-5">
+                <div class="flex flex-col gap-2 mb-4">
                     <div class="flex items-center justify-between">
                         <label class="text-[11px] uppercase tracking-wider font-bold text-slate-400 flex items-center gap-1.5"><i data-lucide="type" class="w-3.5 h-3.5"></i> 照片短描述</label>
                         <button onclick="window.removeBatchItem('${item.id}')" class="text-slate-400 hover:text-rose-500 bg-slate-50 hover:bg-rose-50 p-1.5 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -784,7 +756,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5 p-4 bg-emerald-50/40 rounded-xl border border-emerald-100">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 p-4 bg-emerald-50/40 rounded-xl border border-emerald-100">
                     <div>
                         <div class="flex items-center justify-between mb-2">
                             <label class="text-[10px] uppercase tracking-wider font-bold text-slate-500">國家/縣市</label>
@@ -797,28 +769,32 @@
                             <label class="text-[10px] uppercase tracking-wider font-bold text-slate-500">鄉鎮市區</label>
                             ${item.suggestions.locationCity ? `<button onclick="window.openAddTagModal('locationDist', '${item.suggestions.locationCity}')" class="text-emerald-500 hover:text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md" title="在此新增"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
                         </div>
-                        ${item.suggestions.locationCity ? (distOpts.length > 0 ? createPillGroup('updateBatchItem', item.id, 'locationDist', distOpts, item.suggestions.locationDist, 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-2">無子區域選項，請按上方 + 號新增</p>') : '<p class="text-[11px] font-bold text-slate-400 py-2">請先選擇左側縣市</p>'}
+                        ${item.suggestions.locationCity ? (distOpts.length > 0 ? createPillGroup('updateBatchItem', item.id, 'locationDist', distOpts, item.suggestions.locationDist, 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-2">無子區域選項，請新增</p>') : '<p class="text-[11px] font-bold text-slate-400 py-2">請先選擇左側縣市</p>'}
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                         <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">內容分類</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
                         ${createPillGroup('updateBatchItem', item.id, 'content', state.categories.content, item.suggestions.content, 'bg-blue-100 border-blue-300 text-blue-800')}
                     </div>
                     <div>
-                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">歸檔年份</label><button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">發行年份</label><button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
                         ${createPillGroup('updateBatchItem', item.id, 'year', state.categories.year, item.suggestions.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
                     </div>
                     <div>
                         <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">雜誌期數</label><button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
                         ${createPillGroup('updateBatchItem', item.id, 'issue', state.categories.issue, item.suggestions.issue, 'bg-violet-100 border-violet-300 text-violet-800')}
                     </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">相關備註</label><button onclick="window.openAddTagModal('remarks')" class="text-amber-500 bg-amber-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        ${createPillGroup('updateBatchItem', item.id, 'remarks', state.categories.remarks || [], item.suggestions.remarks, 'bg-amber-100 border-amber-300 text-amber-800')}
+                    </div>
                 </div>
             `;
         }
 
-        // 新增：將單張編輯的表單獨立出來
+        // 加入 Remarks (相關備註) 至編輯表單，並將排版改為 4 欄
         function renderEditModalForm(photo) {
             const cityOpts = Object.keys(state.categories.locationHierarchy);
             const distOpts = photo.locationCity ? state.categories.locationHierarchy[photo.locationCity] : [];
@@ -831,7 +807,7 @@
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 shadow-sm">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 shadow-sm">
                     <div>
                         <div class="flex items-center justify-between mb-3">
                             <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">國家 / 縣市</label>
@@ -848,18 +824,22 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                         <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">內容分類</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
                         ${createPillGroup('updateEditModalField', null, 'content', state.categories.content, photo.content, 'bg-blue-100 border-blue-300 text-blue-800')}
                     </div>
-                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                         <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">發行年份</label><button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
                         ${createPillGroup('updateEditModalField', null, 'year', state.categories.year, photo.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
                     </div>
-                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                         <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">雜誌期數</label><button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
                         ${createPillGroup('updateEditModalField', null, 'issue', state.categories.issue, photo.issue, 'bg-violet-100 border-violet-300 text-violet-800')}
+                    </div>
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">相關備註</label><button onclick="window.openAddTagModal('remarks')" class="text-amber-500 bg-amber-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        ${createPillGroup('updateEditModalField', null, 'remarks', state.categories.remarks || [], photo.remarks, 'bg-amber-100 border-amber-300 text-amber-800')}
                     </div>
                 </div>
             `;
@@ -869,11 +849,10 @@
             const container = document.getElementById('modals-container');
             let html = '';
 
-            // AI 批次上傳彈窗
             if (state.isBatchModalOpen) {
                 html += `
                 <div class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 md:p-8">
-                    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-popIn">
+                    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-full max-h-[95vh] flex flex-col overflow-hidden animate-popIn">
                         <div class="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50 shrink-0">
                             <div class="flex items-center gap-4">
                                 <div class="bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-600 p-2.5 rounded-xl shadow-sm"><i data-lucide="sparkles" class="w-6 h-6"></i></div>
@@ -886,8 +865,8 @@
                         </div>
                         <div id="batch-modal-content" class="flex-1 overflow-y-auto bg-slate-100/50 p-4 md:p-6 space-y-4 custom-scrollbar">
                             ${state.uploadBatch.map((item, index) => `
-                                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col lg:flex-row gap-6 relative">
-                                    <div class="w-full lg:w-56 h-48 lg:h-auto lg:aspect-[4/3] rounded-xl overflow-hidden relative shrink-0 bg-slate-100 border border-slate-100">
+                                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col xl:flex-row gap-6 relative">
+                                    <div class="w-full xl:w-64 h-48 xl:h-auto xl:aspect-[4/3] rounded-xl overflow-hidden relative shrink-0 bg-slate-100 border border-slate-100">
                                         <img src="${item.url}" class="w-full h-full object-cover" />
                                         ${state.batchStatus === 'analyzing' ? `<div class="absolute inset-0 bg-blue-900/50 flex items-center justify-center backdrop-blur-[2px]"><div class="absolute top-0 left-0 w-full h-0.5 bg-blue-400 shadow-[0_0_12px_#60a5fa] scan-line" style="animation-delay: ${index * 0.2}s"></div><i data-lucide="cpu" class="w-8 h-8 text-white animate-pulse"></i></div>` : ''}
                                     </div>
@@ -907,13 +886,12 @@
                 </div>`;
             }
 
-            // 單張編輯彈窗
             if (state.editModal.isOpen && state.editModal.photo) {
                 const photo = state.editModal.photo;
                 
                 html += `
                 <div class="fixed inset-0 z-[105] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6">
-                    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-full animate-popIn">
+                    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-full animate-popIn">
                         <div class="px-6 py-5 border-b border-slate-100 bg-white flex items-center gap-3 shrink-0">
                             <div class="bg-slate-100 text-slate-600 p-2 rounded-lg"><i data-lucide="pencil" class="w-5 h-5"></i></div>
                             <h3 class="font-extrabold text-slate-900 text-lg">編輯照片屬性</h3>
@@ -938,6 +916,7 @@
                 let title = '新增標籤'; let hint = '';
                 if (state.tagModal.type === 'locationCity') { title = '新增 國家/縣市'; hint = '例如: 日本-京都'; }
                 else if (state.tagModal.type === 'locationDist') { title = `新增區域 (${state.tagModal.parentCity})`; hint = '例如: 嵐山區'; }
+                else if (state.tagModal.type === 'remarks') { title = '新增相關備註'; hint = '例如: 空拍、活動紀錄'; }
 
                 html += `
                 <div class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4">
@@ -995,13 +974,12 @@
             });
         }
 
-        // === STREAMING_CHUNK:Event Handlers & AI logic... ===
         window.openEditModal = (photoId) => {
             const photo = state.photos.find(p => p.id === photoId);
             if (photo) { 
                 let cText = photo.customText !== undefined ? photo.customText : '';
                 if (photo.customText === undefined && photo.title) {
-                     const tags = [photo.locationCity, photo.locationDist, photo.content, photo.year, photo.issue].filter(Boolean);
+                     const tags = [photo.locationCity, photo.locationDist, photo.content, photo.year, photo.issue, photo.remarks].filter(Boolean);
                      const prefix = tags.join('-');
                      if (photo.title.startsWith(prefix + '-')) cText = photo.title.replace(prefix + '-', '');
                      else if (photo.title !== prefix) cText = photo.title; 
@@ -1014,7 +992,6 @@
         window.closeEditModal = () => { state.editModal = { isOpen: false, photo: null }; updateModals(); };
         window.updateEditModalCustomText = (val) => { if (state.editModal.photo) state.editModal.photo.customText = val; };
         
-        // 修改：使用精準 DOM 更新替換局部表單，不再重繪整個 Modal 避免閃爍
         window.updateEditModalField = (field, value) => {
             if (state.editModal.photo) {
                 state.editModal.photo[field] = value;
@@ -1031,12 +1008,13 @@
         window.savePhotoEdit = async () => {
             if (!state.user || !state.editModal.photo) return;
             const photo = state.editModal.photo;
-            const tags = [photo.locationCity, photo.locationDist, photo.content, photo.year, photo.issue].filter(Boolean);
+            const tags = [photo.locationCity, photo.locationDist, photo.content, photo.year, photo.issue, photo.remarks].filter(Boolean);
             const finalTitle = [...tags, photo.customText || ''].filter(Boolean).join('-') || '未命名圖片';
             
             const updatedFields = {
                 title: finalTitle, customText: photo.customText || '', content: photo.content || '', 
-                year: photo.year || '', issue: photo.issue || '', locationCity: photo.locationCity || '', locationDist: photo.locationDist || ''
+                year: photo.year || '', issue: photo.issue || '', remarks: photo.remarks || '', 
+                locationCity: photo.locationCity || '', locationDist: photo.locationDist || ''
             };
 
             try {
@@ -1120,6 +1098,7 @@
             - content: 從 ${JSON.stringify(categories.content)} 中挑選一個，無則留空。
             - year: 從 ${JSON.stringify(categories.year)} 中挑選一個，無則留空。
             - issue: 從 ${JSON.stringify(categories.issue)} 中挑選一個，無則留空。
+            - remarks: 從 ${JSON.stringify(categories.remarks || [])} 中挑選一個最適合的標籤描述 (如空拍、夜景)，無則留空。
             - locationCity: 必須是 ${JSON.stringify(Object.keys(categories.locationHierarchy))} 其中之一，無則留空。
             - locationDist: 根據所選城市自行判斷適合的區域，無則留空。
             - customText: 10字以內的繁體中文精準短描述。`;
@@ -1145,7 +1124,7 @@
             try {
                 state.uploadBatch = await Promise.all(files.map(async (file, i) => ({
                     id: `batch-${Date.now()}-${i}`, url: await compressImage(file), originalName: file.name,
-                    suggestions: { customText: 'AI 智慧解析中...', content: '', year: '', issue: '', locationCity: '', locationDist: '' }
+                    suggestions: { customText: 'AI 智慧解析中...', content: '', year: '', issue: '', remarks: '', locationCity: '', locationDist: '' }
                 }))); updateModals();
 
                 for (let i = 0; i < state.uploadBatch.length; i++) {
@@ -1155,10 +1134,10 @@
                         item.suggestions = {
                             customText: aiResult.customText || item.originalName.replace(/\.[^/.]+$/, "").substring(0, 10),
                             content: aiResult.content || '', year: aiResult.year || '', issue: aiResult.issue || '',
-                            locationCity: aiResult.locationCity || '', locationDist: aiResult.locationDist || ''
+                            remarks: aiResult.remarks || '', locationCity: aiResult.locationCity || '', locationDist: aiResult.locationDist || ''
                         };
                     } catch (err) {
-                        item.suggestions = { customText: item.originalName.replace(/\.[^/.]+$/, "").substring(0, 10), content: '', year: '', issue: '', locationCity: '', locationDist: '' };
+                        item.suggestions = { customText: item.originalName.replace(/\.[^/.]+$/, "").substring(0, 10), content: '', year: '', issue: '', remarks: '', locationCity: '', locationDist: '' };
                         if (err.message.toLowerCase().includes('quota') || err.message.toLowerCase().includes('429')) {
                             alert(`🚨 觸發了 Google API 的限流保護！\n剩下的照片將暫時跳過 AI 解析，您可直接手動確認。`);
                             for (let j = i + 1; j < state.uploadBatch.length; j++) state.uploadBatch[j].suggestions.customText = state.uploadBatch[j].originalName.replace(/\.[^/.]+$/, "").substring(0, 10);
@@ -1175,7 +1154,6 @@
 
         window.updateBatchItemCustomText = (id, val) => { const i = state.uploadBatch.find(x=>x.id===id); if(i) i.suggestions.customText = val; };
         
-        // 修改：使用精準 DOM 更新替換該項目的局部表單，不再重繪整個 Modal 避免圖片與滾動條閃爍
         window.updateBatchItem = (id, fld, val) => { 
             const i = state.uploadBatch.find(x=>x.id===id); 
             if(i) { 
@@ -1198,12 +1176,11 @@
             try {
                 const itemsToSave = state.uploadBatch.map(item => {
                     const s = item.suggestions;
-                    const tags = [s.locationCity, s.locationDist, s.content, s.year, s.issue].filter(Boolean);
+                    const tags = [s.locationCity, s.locationDist, s.content, s.year, s.issue, s.remarks].filter(Boolean);
                     let finalTitle = [...tags, s.customText || ''].filter(Boolean).join('-');
-                    return { id: 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7), url: item.url, title: finalTitle || '未命名', customText: s.customText || '', content: s.content || '', year: s.year || '', issue: s.issue || '', locationCity: s.locationCity || '', locationDist: s.locationDist || '', createdAt: Date.now() };
+                    return { id: 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7), url: item.url, title: finalTitle || '未命名', customText: s.customText || '', content: s.content || '', year: s.year || '', issue: s.issue || '', remarks: s.remarks || '', locationCity: s.locationCity || '', locationDist: s.locationDist || '', createdAt: Date.now() };
                 });
                 
-                // 使用原版 Firestore import
                 const { addDoc, collection } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'photo_batches'), { items: itemsToSave, createdAt: Date.now() });
                 
