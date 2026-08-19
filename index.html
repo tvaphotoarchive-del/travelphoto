@@ -980,7 +980,7 @@
             return `
                 <div class="mb-4 bg-blue-50 text-blue-700 p-3 rounded-xl text-xs font-bold flex items-start gap-2 border border-blue-100">
                     <i data-lucide="info" class="w-4 h-4 mt-0.5 shrink-0"></i> 
-                    <div>這裡選取的設定將會「統一覆蓋」所選的 ${state.selectedIds.size} 張照片，未選取的欄位將保留照片原本的設定。</div>
+                    <div>這裡選取的設定將會套用至所選的 ${state.selectedIds.size} 張照片，未選取的欄位將保留原設定。<br/>註：內容分類 (多選) 採「附加」模式，不會覆蓋照片原有的其他內容標籤。</div>
                 </div>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 shadow-sm mb-4">
@@ -1007,7 +1007,7 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                        <label class="block text-[10px] uppercase font-bold text-slate-500 mb-3">統一變更 內容分類 (多選)</label>
+                        <label class="block text-[10px] uppercase font-bold text-slate-500 mb-3">統一附加 內容分類 (多選)</label>
                         ${createMultiPillGroup('updateBulkEditField', null, 'content', state.categories.content, data.content || [], 'bg-blue-100 border-blue-300 text-blue-800')}
                     </div>
                     <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
@@ -1342,11 +1342,20 @@
                 // 1. 更新獨立照片
                 legacyIds.forEach(photo => {
                     const newPhoto = { ...photo, ...updates };
+                    
+                    // 內容分類(多選)採附加模式
+                    if (updates.content) {
+                        const oldContent = Array.isArray(photo.content) ? photo.content : (photo.content ? [photo.content] : []);
+                        newPhoto.content = [...new Set([...oldContent, ...updates.content])];
+                    }
+
                     const contentTags = Array.isArray(newPhoto.content) ? newPhoto.content : (newPhoto.content ? [newPhoto.content] : []);
                     const tags = [newPhoto.locationCity, newPhoto.locationDist, newPhoto.year, newPhoto.yearEdition, ...contentTags, newPhoto.issue, newPhoto.remarks].filter(Boolean);
                     newPhoto.title = [...tags, newPhoto.customText || ''].filter(Boolean).join('-') || '未命名圖片';
 
                     const updatePayload = { ...updates, title: newPhoto.title };
+                    if (updates.content) updatePayload.content = newPhoto.content; // 確保送出的是合併後的陣列
+
                     promises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'photos', photo.id), updatePayload, { merge: true }));
 
                     // 本地更新
@@ -1369,6 +1378,13 @@
                                 const itemIndex = items.findIndex(i => i.id === photo.id);
                                 if (itemIndex > -1) {
                                     const newPhoto = { ...items[itemIndex], ...updates };
+                                    
+                                    // 內容分類(多選)採附加模式
+                                    if (updates.content) {
+                                        const oldContent = Array.isArray(items[itemIndex].content) ? items[itemIndex].content : (items[itemIndex].content ? [items[itemIndex].content] : []);
+                                        newPhoto.content = [...new Set([...oldContent, ...updates.content])];
+                                    }
+
                                     const contentTags = Array.isArray(newPhoto.content) ? newPhoto.content : (newPhoto.content ? [newPhoto.content] : []);
                                     const tags = [newPhoto.locationCity, newPhoto.locationDist, newPhoto.year, newPhoto.yearEdition, ...contentTags, newPhoto.issue, newPhoto.remarks].filter(Boolean);
                                     newPhoto.title = [...tags, newPhoto.customText || ''].filter(Boolean).join('-') || '未命名圖片';
