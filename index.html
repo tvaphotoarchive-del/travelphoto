@@ -29,9 +29,9 @@
 </head>
 <body class="bg-slate-50 font-sans text-slate-800 antialiased selection:bg-blue-200 selection:text-blue-900">
 
+    <!-- === STREAMING_CHUNK:Building the Login Screen... === -->
     <div id="login-screen" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-lg transition-opacity duration-500 px-4">
         <div class="bg-white/90 backdrop-blur-xl rounded-3xl p-8 w-full max-w-sm shadow-2xl transform transition-all animate-popIn text-center border border-white/40">
-            <!-- 替換為台灣觀光協會 Logo -->
             <div class="h-24 flex items-center justify-center mx-auto mb-4 transform hover:scale-105 transition-transform">
                 <img src="image_baefbd.png" alt="台灣觀光協會 TVA Logo" class="h-full object-contain drop-shadow-sm" onerror="this.src='https://placehold.co/200x80/ffffff/333333?text=TravelLens'" />
             </div>
@@ -50,6 +50,7 @@
         </div>
     </div>
 
+    <!-- === STREAMING_CHUNK:Laying out the Main Application Grid... === -->
     <div class="flex flex-col md:flex-row h-screen relative hidden overflow-hidden" id="app">
         
         <!-- 1. 左側過濾面板 -->
@@ -110,6 +111,7 @@
     <!-- Modals Container -->
     <div id="modals-container"></div>
 
+    <!-- === STREAMING_CHUNK:Initializing Firebase and Core State... === -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
@@ -134,9 +136,13 @@
             displayLimit: 30,
             categories: {
                 content: ['景點','娛樂','餐飲','住宿','交通','自然','人文'], 
-                year: ['2026', '2027', '2028'],
+                yearHierarchy: {
+                    '2026': ['日文刊', '韓文刊', '繁中刊'],
+                    '2027': [],
+                    '2028': []
+                },
                 issue: ['Vol.12', 'Vol.13', 'Vol.14'],
-                remarks: ['空拍', '夜景', '人像', '特殊企劃'], // 新增相關備註分類預設值
+                remarks: ['空拍', '夜景', '人像', '特殊企劃'], 
                 locationHierarchy: {
                     '台灣-花蓮': ['花蓮市', '吉安鄉', '秀林鄉'],
                     '台灣-墾丁': ['恆春鎮'],
@@ -146,7 +152,7 @@
                 }
             },
             searchQuery: '',
-            filters: { content: [], year: [], issue: [], remarks: [], locationCity: [], locationDist: [] }, // 新增 remarks 篩選狀態
+            filters: { content: [], year: [], yearEdition: [], issue: [], remarks: [], locationCity: [], locationDist: [] }, 
             moodBoard: [],
             
             isSelectionMode: false,
@@ -204,8 +210,14 @@
                 const tagsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'tags_v2');
                 unsubTags = onSnapshot(tagsRef, (docSnap) => {
                     if (docSnap.exists()) { 
-                        state.categories = { ...state.categories, ...docSnap.data() }; 
-                        // 確保如果舊資料庫沒有 remarks，至少補上空陣列
+                        const data = docSnap.data();
+                        // 遷移舊的 year 陣列至 yearHierarchy
+                        if (data.year && Array.isArray(data.year) && !data.yearHierarchy) {
+                            data.yearHierarchy = {};
+                            data.year.forEach(y => data.yearHierarchy[y] = []);
+                            delete data.year;
+                        }
+                        state.categories = { ...state.categories, ...data }; 
                         if (!state.categories.remarks) state.categories.remarks = [];
                         updateFilters(); 
                         updateModals(); 
@@ -255,10 +267,12 @@
             else el.innerHTML = `<span class="flex items-center text-rose-500 uppercase"><div class="w-1.5 h-1.5 bg-rose-500 rounded-full mr-1.5"></div> 連線中...</span>`;
         }
 
+        // === STREAMING_CHUNK:Rendering Smart Filters (Zero Flash)... ===
         function updateFilters() {
             const detailsStates = {};
             document.querySelectorAll('details.loc-group').forEach(el => {
-                if (el.dataset.city) detailsStates[el.dataset.city] = el.open;
+                if (el.dataset.city) detailsStates['loc_'+el.dataset.city] = el.open;
+                if (el.dataset.year) detailsStates['year_'+el.dataset.year] = el.open;
             });
             const container = document.getElementById('filters-container');
             if(!container) return;
@@ -266,11 +280,65 @@
 
             let html = '';
             html += renderFilterSection('content', '內容與體驗', 'bookmark', 'blue', state.categories.content);
-            html += renderFilterSection('year', '發行年份', 'calendar', 'indigo', state.categories.year);
             html += renderFilterSection('issue', '雜誌期數', 'book-open', 'violet', state.categories.issue);
-            // 新增相關備註的過濾器
             html += renderFilterSection('remarks', '相關備註', 'tag', 'amber', state.categories.remarks || []);
             
+            // 年份與語系 (巢狀)
+            html += `
+            <div class="mb-2">
+                <h3 class="text-[11px] font-bold tracking-widest text-slate-400 mb-3 flex items-center justify-between uppercase">
+                    <div class="flex items-center gap-1.5"><i data-lucide="calendar" class="w-3.5 h-3.5"></i> 發行年份與刊物</div>
+                    <button onclick="window.openAddTagModal('year')" class="text-slate-400 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 p-1 rounded-md transition-colors" title="新增年份"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                </h3>
+            `;
+            
+            Object.keys(state.categories.yearHierarchy || {}).forEach(year => {
+                const editions = state.categories.yearHierarchy[year] || [];
+                const isYearChecked = state.filters.year.includes(year);
+                const isOpen = detailsStates['year_'+year] ? 'open' : '';
+                
+                html += `
+                <details class="loc-group mb-1 group/details" data-year="${year}" ${isOpen}>
+                    <summary class="flex items-center justify-between cursor-pointer py-1.5 px-2 hover:bg-slate-100/70 rounded-lg select-none transition-colors">
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                            <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400 transition-transform group-open/details:rotate-90 shrink-0"></i>
+                            <label class="flex items-center space-x-2.5 cursor-pointer flex-1 min-w-0" onclick="event.stopPropagation(); window.toggleFilter('year', '${year}')">
+                                <div class="w-4 h-4 rounded border flex items-center justify-center transition-all duration-200 shrink-0 ${isYearChecked ? 'bg-indigo-500 border-indigo-500 shadow-sm shadow-indigo-500/20' : 'border-slate-300 hover:border-indigo-400 bg-white'}">
+                                    ${isYearChecked ? '<i data-lucide="check" class="text-white w-3 h-3"></i>' : ''}
+                                </div>
+                                <span class="text-sm font-semibold truncate ${isYearChecked ? 'text-slate-900' : 'text-slate-600'}">${year}</span>
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-1 opacity-0 group-hover/details:opacity-100 shrink-0">
+                            <button onclick="event.preventDefault(); window.openAddTagModal('yearEdition', '${year}')" class="text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-indigo-50" title="在此新增語系/刊物"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
+                            <button onclick="event.preventDefault(); window.handleDeleteTag('year', '${year}')" class="text-slate-400 hover:text-rose-500 p-1 rounded hover:bg-rose-50" title="刪除"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                    </summary>
+                    <div class="pl-8 mt-1 space-y-1 mb-3 relative before:absolute before:left-4 before:top-0 before:bottom-2 before:w-px before:bg-slate-200">
+                `;
+                
+                if (editions.length === 0) {
+                    html += `<p class="text-[11px] text-slate-400 font-medium py-1">無子項目</p>`;
+                } else {
+                    editions.forEach(ed => {
+                        const isEdChecked = state.filters.yearEdition.includes(`${year}|${ed}`);
+                        html += `
+                        <div class="flex items-center justify-between group py-1 pr-2">
+                            <label class="flex items-center space-x-2.5 cursor-pointer flex-1 min-w-0" onclick="event.preventDefault(); window.toggleFilter('yearEdition', '${year}|${ed}')">
+                                <div class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all duration-200 shrink-0 ${isEdChecked ? 'bg-indigo-500 border-indigo-500 shadow-sm' : 'border-slate-300 hover:border-indigo-400 bg-white'}">
+                                    ${isEdChecked ? '<i data-lucide="check" class="text-white w-2.5 h-2.5"></i>' : ''}
+                                </div>
+                                <span class="text-sm font-medium truncate ${isEdChecked ? 'text-slate-900' : 'text-slate-500'}">${ed}</span>
+                            </label>
+                            <button onclick="window.handleDeleteTag('yearEdition', '${year}|${ed}', event)" class="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-50"><i data-lucide="x" class="w-3 h-3"></i></button>
+                        </div>`;
+                    });
+                }
+                html += `</div></details>`;
+            });
+            html += `</div>`;
+
+            // 地理位置
             html += `
             <div class="mb-2">
                 <h3 class="text-[11px] font-bold tracking-widest text-slate-400 mb-3 flex items-center justify-between uppercase">
@@ -282,7 +350,7 @@
             Object.keys(state.categories.locationHierarchy).forEach(city => {
                 const dists = state.categories.locationHierarchy[city];
                 const isCityChecked = state.filters.locationCity.includes(city);
-                const isOpen = detailsStates[city] ? 'open' : '';
+                const isOpen = detailsStates['loc_'+city] ? 'open' : '';
                 
                 html += `
                 <details class="loc-group mb-1 group/details" data-city="${city}" ${isOpen}>
@@ -456,6 +524,7 @@
             updateMoodBoard(); 
         };
 
+        // === STREAMING_CHUNK:Rendering Main Gallery Grid... ===
         function renderGallery() {
             renderHeaderActions();
             const container = document.getElementById('gallery-container');
@@ -466,12 +535,21 @@
                 const matchSearch = (photo.title || '').toLowerCase().includes(searchTxt) || 
                                     (photo.locationCity || '').toLowerCase().includes(searchTxt) ||
                                     (photo.locationDist || '').toLowerCase().includes(searchTxt);
-                const matchContent = state.filters.content.length === 0 || state.filters.content.includes(photo.content);
-                const matchYear = state.filters.year.length === 0 || state.filters.year.includes(photo.year);
+                
+                // 多選內容判斷
+                const contentTags = Array.isArray(photo.content) ? photo.content : (photo.content ? [photo.content] : []);
+                const matchContent = state.filters.content.length === 0 || state.filters.content.some(c => contentTags.includes(c));
                 const matchIssue = state.filters.issue.length === 0 || state.filters.issue.includes(photo.issue);
-                // 增加 Remarks 過濾
                 const matchRemarks = state.filters.remarks.length === 0 || (photo.remarks && state.filters.remarks.includes(photo.remarks));
                 
+                // 巢狀年份判斷
+                let matchYear = true;
+                if (state.filters.year.length > 0 || state.filters.yearEdition.length > 0) {
+                    const yMatch = state.filters.year.includes(photo.year);
+                    const edMatch = state.filters.yearEdition.includes(`${photo.year}|${photo.yearEdition}`);
+                    matchYear = yMatch || edMatch;
+                }
+
                 let matchLocation = true;
                 if (state.filters.locationCity.length > 0 || state.filters.locationDist.length > 0) {
                     const cityMatch = state.filters.locationCity.includes(photo.locationCity);
@@ -500,6 +578,11 @@
                 const inMoodboard = state.moodBoard.some(p => p.id === photo.id);
                 const isSelected = state.selectedIds.has(photo.id);
                 const locDisplay = [photo.locationCity, photo.locationDist].filter(Boolean).join(', ');
+                const yearDisplay = [photo.year, photo.yearEdition].filter(Boolean).join(' | ');
+                
+                // 動態產生多選內容標籤
+                const contentTags = Array.isArray(photo.content) ? photo.content : (photo.content ? [photo.content] : []);
+                const contentDisplay = contentTags.map(c => `<span class="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded text-slate-600"><i data-lucide="bookmark" class="w-3 h-3"></i> ${c}</span>`).join('');
                 
                 const cardBaseClass = "group relative bg-white rounded-2xl overflow-hidden transition-all duration-300 flex flex-col cursor-pointer";
                 const cardActiveStyle = isSelected ? "ring-4 ring-blue-500 shadow-xl scale-[0.98]" : "border border-slate-200 hover:shadow-xl";
@@ -524,16 +607,14 @@
                             ` : ''}
 
                             <div class="absolute bottom-3 left-3 flex gap-1.5 z-20">
-                                <span class="px-2 py-1 text-[10px] font-bold tracking-wider uppercase bg-white/20 backdrop-blur-md text-white rounded shadow-sm flex items-center gap-1 border border-white/20">
-                                    <i data-lucide="calendar" class="w-3 h-3"></i> ${photo.year || '無年份'} | ${photo.issue || '無期數'}
-                                </span>
+                                ${yearDisplay ? `<span class="px-2 py-1 text-[10px] font-bold tracking-wider uppercase bg-white/20 backdrop-blur-md text-white rounded shadow-sm flex items-center gap-1 border border-white/20"><i data-lucide="calendar" class="w-3 h-3"></i> ${yearDisplay} ${photo.issue ? '| ' + photo.issue : ''}</span>` : ''}
                             </div>
                         </div>
 
                         <div class="p-4 flex-1 flex flex-col bg-white z-10 relative">
                             <h4 class="font-bold text-slate-900 mb-2 truncate text-sm" title="${photo.title}">${photo.customText || photo.title || '未命名'}</h4>
                             <div class="flex flex-wrap gap-1.5 text-[10px] font-semibold text-slate-500 mt-auto">
-                                ${photo.content ? `<span class="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded text-slate-600"><i data-lucide="bookmark" class="w-3 h-3"></i> ${photo.content}</span>` : ''}
+                                ${contentDisplay}
                                 ${locDisplay ? `<span class="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-100"><i data-lucide="map-pin" class="w-3 h-3"></i> ${locDisplay}</span>` : ''}
                                 ${photo.remarks ? `<span class="flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-100"><i data-lucide="tag" class="w-3 h-3"></i> ${photo.remarks}</span>` : ''}
                             </div>
@@ -578,7 +659,7 @@
             updateFilters(); updateGallery();
         };
         window.clearFilters = () => {
-            state.filters = { content: [], year: [], issue: [], remarks: [], locationCity: [], locationDist: [] };
+            state.filters = { content: [], year: [], yearEdition: [], issue: [], remarks: [], locationCity: [], locationDist: [] };
             state.searchQuery = ''; document.getElementById('searchInput').value = '';
             state.displayLimit = 30; document.getElementById('gallery-container').scrollTop = 0;
             updateFilters(); updateGallery();
@@ -658,7 +739,7 @@
                     <label class="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">歸檔年份</label>
                     <select id="project-year" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all cursor-pointer">
                         <option value="" disabled ${!currentYear ? 'selected' : ''}>選擇</option>
-                        ${(state.categories.year || []).map(y => `<option value="${y}" ${currentYear === y ? 'selected' : ''}>${y}</option>`).join('')}
+                        ${(Object.keys(state.categories.yearHierarchy || {})).map(y => `<option value="${y}" ${currentYear === y ? 'selected' : ''}>${y}</option>`).join('')}
                     </select>
                 </div>
                 <div class="flex-1">
@@ -677,12 +758,14 @@
             } else {
                 let html = '';
                 state.moodBoard.forEach(photo => {
+                    const contentTags = Array.isArray(photo.content) ? photo.content : (photo.content ? [photo.content] : []);
+                    const contentStr = contentTags.length > 0 ? contentTags.join(', ') : '無';
                     html += `
                     <div class="relative group bg-white rounded-xl p-2.5 flex gap-3 border border-slate-200 shadow-sm hover:shadow-md transition-all">
                         <img src="${photo.url}" class="w-14 h-14 object-cover rounded-lg shadow-sm" />
                         <div class="flex-1 min-w-0 flex flex-col justify-center">
                             <h5 class="text-xs font-bold text-slate-900 truncate" title="${photo.customText || photo.title}">${photo.customText || photo.title || '未命名'}</h5>
-                            <p class="text-[10px] text-slate-500 mt-1 flex items-center gap-1"><i data-lucide="tag" class="w-3 h-3"></i> ${photo.content || '無'}</p>
+                            <p class="text-[10px] text-slate-500 mt-1 flex items-center gap-1"><i data-lucide="tag" class="w-3 h-3"></i> ${contentStr}</p>
                         </div>
                         <button onclick="window.toggleMoodBoard('${photo.id}')" class="absolute -top-2 -right-2 bg-white border border-slate-200 shadow-sm text-slate-400 hover:text-rose-500 rounded-full p-1.5 opacity-100 md:opacity-0 group-hover:opacity-100 transition-all hover:scale-110">
                             <i data-lucide="x" class="w-3.5 h-3.5"></i>
@@ -740,10 +823,26 @@
             </div>`;
         }
 
-        // 加入 Remarks (相關備註) 至批次表單，並將排版改為 4 欄
+        // 新增支援多選的 Pill Group (用於內容分類等)
+        function createMultiPillGroup(onClickFnName, idOrNull, field, options, selectedValues, colorClassActive) {
+            const sels = Array.isArray(selectedValues) ? selectedValues : (selectedValues ? [selectedValues] : []);
+            return `<div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar pr-1 pb-1">
+                ${options.map(opt => {
+                    const isSel = sels.includes(opt);
+                    const safeOpt = opt.replace(/'/g, "\\'");
+                    const clickArgs = idOrNull ? `'${idOrNull}', '${field}', '${safeOpt}'` : `'${field}', '${safeOpt}'`;
+                    const activeStyle = colorClassActive + ' font-bold shadow-sm ring-2 ring-current ring-inset';
+                    const inactiveStyle = 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 font-semibold';
+                    return `<button type="button" onclick="window.${onClickFnName}(${clickArgs})" class="px-2.5 py-1.5 text-xs rounded-lg border transition-all duration-200 ${isSel ? activeStyle : inactiveStyle}">${opt}</button>`;
+                }).join('')}
+            </div>`;
+        }
+
         function renderBatchItemForm(item) {
             const cityOpts = Object.keys(state.categories.locationHierarchy);
             const distOpts = item.suggestions.locationCity ? state.categories.locationHierarchy[item.suggestions.locationCity] : [];
+            const yearOpts = Object.keys(state.categories.yearHierarchy || {});
+            const editionOpts = item.suggestions.year ? (state.categories.yearHierarchy[item.suggestions.year] || []) : [];
             
             return `
                 <div class="flex flex-col gap-2 mb-4">
@@ -756,7 +855,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 p-4 bg-emerald-50/40 rounded-xl border border-emerald-100">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 p-4 bg-emerald-50/40 rounded-xl border border-emerald-100 shadow-sm">
                     <div>
                         <div class="flex items-center justify-between mb-2">
                             <label class="text-[10px] uppercase tracking-wider font-bold text-slate-500">國家/縣市</label>
@@ -773,20 +872,28 @@
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 p-4 bg-indigo-50/40 rounded-xl border border-indigo-100 shadow-sm">
                     <div>
-                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">內容分類</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
-                        ${createPillGroup('updateBatchItem', item.id, 'content', state.categories.content, item.suggestions.content, 'bg-blue-100 border-blue-300 text-blue-800')}
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">發行年份</label><button onclick="window.openAddTagModal('year')" class="text-indigo-500 hover:text-indigo-700 bg-indigo-100 hover:bg-indigo-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        ${createPillGroup('updateBatchItem', item.id, 'year', yearOpts, item.suggestions.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
                     </div>
                     <div>
-                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">發行年份</label><button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
-                        ${createPillGroup('updateBatchItem', item.id, 'year', state.categories.year, item.suggestions.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">語系 / 刊物</label>
+                        ${item.suggestions.year ? `<button onclick="window.openAddTagModal('yearEdition', '${item.suggestions.year}')" class="text-indigo-500 hover:text-indigo-700 bg-indigo-100 hover:bg-indigo-200 p-1 rounded-md" title="在此新增"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}</div>
+                        ${item.suggestions.year ? (editionOpts.length > 0 ? createPillGroup('updateBatchItem', item.id, 'yearEdition', editionOpts, item.suggestions.yearEdition, 'bg-indigo-100 border-indigo-300 text-indigo-800') : '<p class="text-[11px] font-bold text-slate-400 py-2">無子項目，請新增</p>') : '<p class="text-[11px] font-bold text-slate-400 py-2">請先選擇年份</p>'}
                     </div>
-                    <div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">內容分類 (可多選)</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        ${createMultiPillGroup('updateBatchItem', item.id, 'content', state.categories.content, item.suggestions.content, 'bg-blue-100 border-blue-300 text-blue-800')}
+                    </div>
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                         <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">雜誌期數</label><button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
                         ${createPillGroup('updateBatchItem', item.id, 'issue', state.categories.issue, item.suggestions.issue, 'bg-violet-100 border-violet-300 text-violet-800')}
                     </div>
-                    <div>
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                         <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">相關備註</label><button onclick="window.openAddTagModal('remarks')" class="text-amber-500 bg-amber-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
                         ${createPillGroup('updateBatchItem', item.id, 'remarks', state.categories.remarks || [], item.suggestions.remarks, 'bg-amber-100 border-amber-300 text-amber-800')}
                     </div>
@@ -794,10 +901,11 @@
             `;
         }
 
-        // 加入 Remarks (相關備註) 至編輯表單，並將排版改為 4 欄
         function renderEditModalForm(photo) {
             const cityOpts = Object.keys(state.categories.locationHierarchy);
             const distOpts = photo.locationCity ? state.categories.locationHierarchy[photo.locationCity] : [];
+            const yearOpts = Object.keys(state.categories.yearHierarchy || {});
+            const editionOpts = photo.year ? (state.categories.yearHierarchy[photo.year] || []) : [];
             
             return `
                 <div class="flex flex-col gap-2 mb-2">
@@ -807,7 +915,7 @@
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 shadow-sm">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 shadow-sm mb-4">
                     <div>
                         <div class="flex items-center justify-between mb-3">
                             <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">國家 / 縣市</label>
@@ -824,14 +932,27 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">內容分類</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
-                        ${createPillGroup('updateEditModalField', null, 'content', state.categories.content, photo.content, 'bg-blue-100 border-blue-300 text-blue-800')}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 shadow-sm mb-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">發行年份</label>
+                            <button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 hover:bg-indigo-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                        </div>
+                        ${createPillGroup('updateEditModalField', null, 'year', yearOpts, photo.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
                     </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">語系 / 刊物</label>
+                            ${photo.year ? `<button onclick="window.openAddTagModal('yearEdition', '${photo.year}')" class="text-indigo-500 bg-indigo-100 hover:bg-indigo-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
+                        </div>
+                        ${photo.year ? (editionOpts.length > 0 ? createPillGroup('updateEditModalField', null, 'yearEdition', editionOpts, photo.yearEdition, 'bg-indigo-100 border-indigo-300 text-indigo-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選年份</p>'}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">發行年份</label><button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
-                        ${createPillGroup('updateEditModalField', null, 'year', state.categories.year, photo.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
+                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">內容分類 (可多選)</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        ${createMultiPillGroup('updateEditModalField', null, 'content', state.categories.content, photo.content, 'bg-blue-100 border-blue-300 text-blue-800')}
                     </div>
                     <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                         <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">雜誌期數</label><button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
@@ -916,6 +1037,8 @@
                 let title = '新增標籤'; let hint = '';
                 if (state.tagModal.type === 'locationCity') { title = '新增 國家/縣市'; hint = '例如: 日本-京都'; }
                 else if (state.tagModal.type === 'locationDist') { title = `新增區域 (${state.tagModal.parentCity})`; hint = '例如: 嵐山區'; }
+                else if (state.tagModal.type === 'year') { title = '新增發行年份'; hint = '例如: 2026'; }
+                else if (state.tagModal.type === 'yearEdition') { title = `新增語系/刊物 (${state.tagModal.parentCity})`; hint = '例如: 日文刊、外語版'; }
                 else if (state.tagModal.type === 'remarks') { title = '新增相關備註'; hint = '例如: 空拍、活動紀錄'; }
 
                 html += `
@@ -979,7 +1102,8 @@
             if (photo) { 
                 let cText = photo.customText !== undefined ? photo.customText : '';
                 if (photo.customText === undefined && photo.title) {
-                     const tags = [photo.locationCity, photo.locationDist, photo.content, photo.year, photo.issue, photo.remarks].filter(Boolean);
+                     const contentTags = Array.isArray(photo.content) ? photo.content : (photo.content ? [photo.content] : []);
+                     const tags = [photo.locationCity, photo.locationDist, photo.year, photo.yearEdition, ...contentTags, photo.issue, photo.remarks].filter(Boolean);
                      const prefix = tags.join('-');
                      if (photo.title.startsWith(prefix + '-')) cText = photo.title.replace(prefix + '-', '');
                      else if (photo.title !== prefix) cText = photo.title; 
@@ -994,8 +1118,16 @@
         
         window.updateEditModalField = (field, value) => {
             if (state.editModal.photo) {
-                state.editModal.photo[field] = value;
-                if(field === 'locationCity' && state.editModal.photo.locationDist) state.editModal.photo.locationDist = '';
+                if (field === 'content') {
+                    // 多選邏輯切換
+                    if (!Array.isArray(state.editModal.photo.content)) state.editModal.photo.content = state.editModal.photo.content ? [state.editModal.photo.content] : [];
+                    if (state.editModal.photo.content.includes(value)) state.editModal.photo.content = state.editModal.photo.content.filter(x => x !== value);
+                    else state.editModal.photo.content.push(value);
+                } else {
+                    state.editModal.photo[field] = value;
+                    if(field === 'locationCity' && state.editModal.photo.locationDist) state.editModal.photo.locationDist = '';
+                    if(field === 'year' && state.editModal.photo.yearEdition) state.editModal.photo.yearEdition = '';
+                }
                 
                 const formEl = document.getElementById('edit-photo-form');
                 if (formEl) {
@@ -1008,12 +1140,13 @@
         window.savePhotoEdit = async () => {
             if (!state.user || !state.editModal.photo) return;
             const photo = state.editModal.photo;
-            const tags = [photo.locationCity, photo.locationDist, photo.content, photo.year, photo.issue, photo.remarks].filter(Boolean);
+            const contentTags = Array.isArray(photo.content) ? photo.content : (photo.content ? [photo.content] : []);
+            const tags = [photo.locationCity, photo.locationDist, photo.year, photo.yearEdition, ...contentTags, photo.issue, photo.remarks].filter(Boolean);
             const finalTitle = [...tags, photo.customText || ''].filter(Boolean).join('-') || '未命名圖片';
             
             const updatedFields = {
-                title: finalTitle, customText: photo.customText || '', content: photo.content || '', 
-                year: photo.year || '', issue: photo.issue || '', remarks: photo.remarks || '', 
+                title: finalTitle, customText: photo.customText || '', content: contentTags, 
+                year: photo.year || '', yearEdition: photo.yearEdition || '', issue: photo.issue || '', remarks: photo.remarks || '', 
                 locationCity: photo.locationCity || '', locationDist: photo.locationDist || ''
             };
 
@@ -1055,6 +1188,12 @@
             } else if (type === 'locationDist') {
                 if (state.categories.locationHierarchy[parentCity].includes(tag)) { state.tagModal.error = '此標籤已存在'; updateModals(); return; }
                 state.categories.locationHierarchy[parentCity].push(tag);
+            } else if (type === 'year') {
+                if (state.categories.yearHierarchy[tag]) { state.tagModal.error = '此標籤已存在'; updateModals(); return; }
+                state.categories.yearHierarchy[tag] = [];
+            } else if (type === 'yearEdition') {
+                if (state.categories.yearHierarchy[parentCity].includes(tag)) { state.tagModal.error = '此標籤已存在'; updateModals(); return; }
+                state.categories.yearHierarchy[parentCity].push(tag);
             } else {
                 if (!state.categories[type]) state.categories[type] = [];
                 if (state.categories[type].includes(tag)) { state.tagModal.error = '此標籤已存在'; updateModals(); return; }
@@ -1071,6 +1210,8 @@
                 action: async () => {
                     if (type === 'locationCity') { delete state.categories.locationHierarchy[tagToDelete]; state.filters.locationCity = state.filters.locationCity.filter(t => t !== tagToDelete);
                     } else if (type === 'locationDist') { const [city, dist] = tagToDelete.split('|'); state.categories.locationHierarchy[city] = state.categories.locationHierarchy[city].filter(t => t !== dist); state.filters.locationDist = state.filters.locationDist.filter(t => t !== tagToDelete);
+                    } else if (type === 'year') { delete state.categories.yearHierarchy[tagToDelete]; state.filters.year = state.filters.year.filter(t => t !== tagToDelete);
+                    } else if (type === 'yearEdition') { const [y, ed] = tagToDelete.split('|'); state.categories.yearHierarchy[y] = state.categories.yearHierarchy[y].filter(t => t !== ed); state.filters.yearEdition = state.filters.yearEdition.filter(t => t !== tagToDelete);
                     } else { state.categories[type] = state.categories[type].filter(t => t !== tagToDelete); state.filters[type] = state.filters[type].filter(t => t !== tagToDelete); }
                     if (state.user) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'tags_v2'), state.categories, { merge: true });
                     window.closeConfirmDialog(); updateFilters(); updateGallery();
@@ -1095,8 +1236,9 @@
 
         async function analyzeImageWithGemini(base64Image, categories, apiKey) {
             const prompt = `請分析照片內容，並從給定選項中選擇分類，回傳 JSON：
-            - content: 從 ${JSON.stringify(categories.content)} 中挑選一個，無則留空。
-            - year: 從 ${JSON.stringify(categories.year)} 中挑選一個，無則留空。
+            - content: 從 ${JSON.stringify(categories.content)} 中挑選1~3個符合的分類，以陣列回傳，無則回傳空陣列。
+            - year: 必須是 ${JSON.stringify(Object.keys(categories.yearHierarchy || {}))} 其中之一，無則留空。
+            - yearEdition: 根據所選年份自行判斷適合的語系/刊物，無則留空。
             - issue: 從 ${JSON.stringify(categories.issue)} 中挑選一個，無則留空。
             - remarks: 從 ${JSON.stringify(categories.remarks || [])} 中挑選一個最適合的標籤描述 (如空拍、夜景)，無則留空。
             - locationCity: 必須是 ${JSON.stringify(Object.keys(categories.locationHierarchy))} 其中之一，無則留空。
@@ -1124,7 +1266,7 @@
             try {
                 state.uploadBatch = await Promise.all(files.map(async (file, i) => ({
                     id: `batch-${Date.now()}-${i}`, url: await compressImage(file), originalName: file.name,
-                    suggestions: { customText: 'AI 智慧解析中...', content: '', year: '', issue: '', remarks: '', locationCity: '', locationDist: '' }
+                    suggestions: { customText: 'AI 智慧解析中...', content: [], year: '', yearEdition: '', issue: '', remarks: '', locationCity: '', locationDist: '' }
                 }))); updateModals();
 
                 for (let i = 0; i < state.uploadBatch.length; i++) {
@@ -1133,11 +1275,12 @@
                         const aiResult = await analyzeImageWithGemini(item.url, state.categories, apiKey);
                         item.suggestions = {
                             customText: aiResult.customText || item.originalName.replace(/\.[^/.]+$/, "").substring(0, 10),
-                            content: aiResult.content || '', year: aiResult.year || '', issue: aiResult.issue || '',
+                            content: Array.isArray(aiResult.content) ? aiResult.content : (aiResult.content ? [aiResult.content] : []),
+                            year: aiResult.year || '', yearEdition: aiResult.yearEdition || '', issue: aiResult.issue || '',
                             remarks: aiResult.remarks || '', locationCity: aiResult.locationCity || '', locationDist: aiResult.locationDist || ''
                         };
                     } catch (err) {
-                        item.suggestions = { customText: item.originalName.replace(/\.[^/.]+$/, "").substring(0, 10), content: '', year: '', issue: '', remarks: '', locationCity: '', locationDist: '' };
+                        item.suggestions = { customText: item.originalName.replace(/\.[^/.]+$/, "").substring(0, 10), content: [], year: '', yearEdition: '', issue: '', remarks: '', locationCity: '', locationDist: '' };
                         if (err.message.toLowerCase().includes('quota') || err.message.toLowerCase().includes('429')) {
                             alert(`🚨 觸發了 Google API 的限流保護！\n剩下的照片將暫時跳過 AI 解析，您可直接手動確認。`);
                             for (let j = i + 1; j < state.uploadBatch.length; j++) state.uploadBatch[j].suggestions.customText = state.uploadBatch[j].originalName.replace(/\.[^/.]+$/, "").substring(0, 10);
@@ -1157,8 +1300,15 @@
         window.updateBatchItem = (id, fld, val) => { 
             const i = state.uploadBatch.find(x=>x.id===id); 
             if(i) { 
-                i.suggestions[fld] = val; 
-                if(fld === 'locationCity' && i.suggestions.locationDist) i.suggestions.locationDist = ''; 
+                if (fld === 'content') {
+                    if (!Array.isArray(i.suggestions.content)) i.suggestions.content = i.suggestions.content ? [i.suggestions.content] : [];
+                    if (i.suggestions.content.includes(val)) i.suggestions.content = i.suggestions.content.filter(x => x !== val);
+                    else i.suggestions.content.push(val);
+                } else {
+                    i.suggestions[fld] = val; 
+                    if(fld === 'locationCity' && i.suggestions.locationDist) i.suggestions.locationDist = ''; 
+                    if(fld === 'year' && i.suggestions.yearEdition) i.suggestions.yearEdition = ''; 
+                }
                 
                 const formEl = document.getElementById(`batch-item-form-${id}`);
                 if (formEl) {
@@ -1176,9 +1326,10 @@
             try {
                 const itemsToSave = state.uploadBatch.map(item => {
                     const s = item.suggestions;
-                    const tags = [s.locationCity, s.locationDist, s.content, s.year, s.issue, s.remarks].filter(Boolean);
+                    const contentTags = Array.isArray(s.content) ? s.content : (s.content ? [s.content] : []);
+                    const tags = [s.locationCity, s.locationDist, s.year, s.yearEdition, ...contentTags, s.issue, s.remarks].filter(Boolean);
                     let finalTitle = [...tags, s.customText || ''].filter(Boolean).join('-');
-                    return { id: 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7), url: item.url, title: finalTitle || '未命名', customText: s.customText || '', content: s.content || '', year: s.year || '', issue: s.issue || '', remarks: s.remarks || '', locationCity: s.locationCity || '', locationDist: s.locationDist || '', createdAt: Date.now() };
+                    return { id: 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7), url: item.url, title: finalTitle || '未命名', customText: s.customText || '', content: contentTags, year: s.year || '', yearEdition: s.yearEdition || '', issue: s.issue || '', remarks: s.remarks || '', locationCity: s.locationCity || '', locationDist: s.locationDist || '', createdAt: Date.now() };
                 });
                 
                 const { addDoc, collection } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
