@@ -163,9 +163,9 @@
             batchStatus: 'idle',
             uploadBatch: [],
             tagModal: { isOpen: false, type: '', error: '', parentCity: '' },
-            newTagValue: '',
             confirmDialog: { isOpen: false, message: '', action: null, isLoading: false },
-            editModal: { isOpen: false, photo: null }
+            editModal: { isOpen: false, photo: null },
+            bulkEdit: { isOpen: false, data: { content: null, year: null, yearEdition: null, issue: null, remarks: null, locationCity: null, locationDist: null } }
         };
 
         let unsubTags = null;
@@ -435,10 +435,13 @@
                     <div class="flex items-center bg-blue-50 text-blue-700 px-3.5 py-2 rounded-xl border border-blue-100 mr-2 text-sm font-bold shadow-sm animate-popIn">
                         已選取 ${state.selectedIds.size} 張
                     </div>
+                    <button onclick="window.openBulkEditModal()" class="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-md transform active:scale-95 mr-2 ${state.selectedIds.size === 0 ? 'opacity-50 cursor-not-allowed saturate-0' : ''}" ${state.selectedIds.size === 0 ? 'disabled' : ''}>
+                        <i data-lucide="tags" class="w-4 h-4"></i> 批次標籤
+                    </button>
                     <button onclick="window.handleBatchDelete()" class="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-md transform active:scale-95 ${state.selectedIds.size === 0 ? 'opacity-50 cursor-not-allowed saturate-0' : ''}" ${state.selectedIds.size === 0 ? 'disabled' : ''}>
                         <i data-lucide="trash-2" class="w-4 h-4"></i> 批次刪除
                     </button>
-                    <button onclick="window.toggleSelectionMode()" class="px-5 py-2 text-sm text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl font-bold transition-all transform active:scale-95">
+                    <button onclick="window.toggleSelectionMode()" class="px-5 py-2 text-sm text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl font-bold transition-all transform active:scale-95 ml-2">
                         取消
                     </button>
                 `;
@@ -966,6 +969,59 @@
             `;
         }
 
+        // === STREAMING_CHUNK:Rendering Bulk Edit Form... ===
+        function renderBulkEditModalForm() {
+            const data = state.bulkEdit.data;
+            const cityOpts = Object.keys(state.categories.locationHierarchy);
+            const distOpts = data.locationCity ? state.categories.locationHierarchy[data.locationCity] : [];
+            const yearOpts = Object.keys(state.categories.yearHierarchy || {});
+            const editionOpts = data.year ? (state.categories.yearHierarchy[data.year] || []) : [];
+            
+            return `
+                <div class="mb-4 bg-blue-50 text-blue-700 p-3 rounded-xl text-xs font-bold flex items-start gap-2 border border-blue-100">
+                    <i data-lucide="info" class="w-4 h-4 mt-0.5 shrink-0"></i> 
+                    <div>這裡選取的設定將會「統一覆蓋」所選的 ${state.selectedIds.size} 張照片，未選取的欄位將保留照片原本的設定。</div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 shadow-sm mb-4">
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-3">統一變更 國家 / 縣市</label>
+                        ${createPillGroup('updateBulkEditField', null, 'locationCity', cityOpts, data.locationCity || '', 'bg-emerald-100 border-emerald-300 text-emerald-800')}
+                    </div>
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-3">統一變更 鄉鎮市區</label>
+                        ${data.locationCity ? (distOpts.length > 0 ? createPillGroup('updateBulkEditField', null, 'locationDist', distOpts, data.locationDist || '', 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請至左側過濾區新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選縣市</p>'}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 shadow-sm mb-4">
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-3">統一變更 發行年份</label>
+                        ${createPillGroup('updateBulkEditField', null, 'year', yearOpts, data.year || '', 'bg-indigo-100 border-indigo-300 text-indigo-800')}
+                    </div>
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-3">統一變更 語系 / 刊物</label>
+                        ${data.year ? (editionOpts.length > 0 ? createPillGroup('updateBulkEditField', null, 'yearEdition', editionOpts, data.yearEdition || '', 'bg-indigo-100 border-indigo-300 text-indigo-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請至左側過濾區新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選年份</p>'}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <label class="block text-[10px] uppercase font-bold text-slate-500 mb-3">統一變更 內容分類 (多選)</label>
+                        ${createMultiPillGroup('updateBulkEditField', null, 'content', state.categories.content, data.content || [], 'bg-blue-100 border-blue-300 text-blue-800')}
+                    </div>
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <label class="block text-[10px] uppercase font-bold text-slate-500 mb-3">統一變更 雜誌期數</label>
+                        ${createPillGroup('updateBulkEditField', null, 'issue', state.categories.issue, data.issue || '', 'bg-violet-100 border-violet-300 text-violet-800')}
+                    </div>
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <label class="block text-[10px] uppercase font-bold text-slate-500 mb-3">統一變更 相關備註</label>
+                        ${createPillGroup('updateBulkEditField', null, 'remarks', state.categories.remarks || [], data.remarks || '', 'bg-amber-100 border-amber-300 text-amber-800')}
+                    </div>
+                </div>
+            `;
+        }
+
         function renderModals() {
             const container = document.getElementById('modals-container');
             let html = '';
@@ -1033,6 +1089,31 @@
                 </div>`;
             }
 
+            // === 批次修改標籤彈窗 ===
+            if (state.bulkEdit.isOpen) {
+                html += `
+                <div class="fixed inset-0 z-[105] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6">
+                    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-full animate-popIn">
+                        <div class="px-6 py-5 border-b border-slate-100 bg-white flex items-center gap-3 shrink-0">
+                            <div class="bg-indigo-100 text-indigo-600 p-2 rounded-lg"><i data-lucide="tags" class="w-5 h-5"></i></div>
+                            <h3 class="font-extrabold text-slate-900 text-lg">批次修改標籤 (${state.selectedIds.size} 張)</h3>
+                        </div>
+                        <div id="bulk-edit-content" class="p-6 overflow-y-auto space-y-6 custom-scrollbar bg-slate-50/50">
+                            <div id="bulk-edit-form">
+                                ${renderBulkEditModalForm()}
+                            </div>
+                        </div>
+                        <div class="px-6 py-5 border-t border-slate-100 bg-white flex justify-between items-center shrink-0">
+                            <div></div> 
+                            <div class="flex gap-3">
+                                <button onclick="window.closeBulkEditModal()" class="px-5 py-2.5 text-sm text-slate-500 hover:bg-slate-100 rounded-xl transition-all font-bold">取消</button>
+                                <button id="bulk-save-btn" onclick="window.saveBulkEdit()" class="px-8 py-2.5 text-sm bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl transition-all shadow-lg font-bold transform active:scale-95">確認套用變更</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
             if (state.tagModal.isOpen) {
                 let title = '新增標籤'; let hint = '';
                 if (state.tagModal.type === 'locationCity') { title = '新增 國家/縣市'; hint = '例如: 日本-京都'; }
@@ -1085,15 +1166,18 @@
         function updateModals() {
             const batchModal = document.getElementById('batch-modal-content');
             const editModal = document.getElementById('edit-modal-content');
+            const bulkModal = document.getElementById('bulk-edit-content');
             const batchScrollTop = batchModal ? batchModal.scrollTop : 0;
             const editScrollTop = editModal ? editModal.scrollTop : 0;
+            const bulkScrollTop = bulkModal ? bulkModal.scrollTop : 0;
             
             renderModals(); lucide.createIcons();
             
             requestAnimationFrame(() => {
-                const newB = document.getElementById('batch-modal-content'); const newE = document.getElementById('edit-modal-content');
+                const newB = document.getElementById('batch-modal-content'); const newE = document.getElementById('edit-modal-content'); const newBulk = document.getElementById('bulk-edit-content');
                 if (newB && batchScrollTop > 0) newB.scrollTop = batchScrollTop;
                 if (newE && editScrollTop > 0) newE.scrollTop = editScrollTop;
+                if (newBulk && bulkScrollTop > 0) newBulk.scrollTop = bulkScrollTop;
             });
         }
 
@@ -1170,6 +1254,151 @@
                 
                 updateGallery(); updateMoodBoard(); 
             } catch (err) { console.error(err); alert("儲存失敗"); }
+        };
+
+        // === STREAMING_CHUNK:Bulk Edit Logic... ===
+        window.openBulkEditModal = () => {
+            state.bulkEdit = {
+                isOpen: true,
+                data: { content: null, year: null, yearEdition: null, issue: null, remarks: null, locationCity: null, locationDist: null }
+            };
+            updateModals();
+        };
+
+        window.closeBulkEditModal = () => {
+            state.bulkEdit.isOpen = false;
+            updateModals();
+        };
+
+        window.updateBulkEditField = (field, value) => {
+            if (field === 'content') {
+                if (state.bulkEdit.data.content === null) state.bulkEdit.data.content = [];
+                // 如果點選空字串(解除選取)，將該標籤移除
+                if (value === '') return; 
+                
+                if (state.bulkEdit.data.content.includes(value)) {
+                    state.bulkEdit.data.content = state.bulkEdit.data.content.filter(x => x !== value);
+                    if (state.bulkEdit.data.content.length === 0) state.bulkEdit.data.content = null; // 全取消視同無修改
+                } else {
+                    state.bulkEdit.data.content.push(value);
+                }
+            } else {
+                if (value === '') {
+                    // 取消選取視同「不修改該欄位」
+                    state.bulkEdit.data[field] = null;
+                } else {
+                    state.bulkEdit.data[field] = value;
+                }
+                
+                if (field === 'locationCity' && state.bulkEdit.data.locationDist !== null) state.bulkEdit.data.locationDist = null;
+                if (field === 'year' && state.bulkEdit.data.yearEdition !== null) state.bulkEdit.data.yearEdition = null;
+            }
+            
+            const formEl = document.getElementById('bulk-edit-form');
+            if (formEl) {
+                formEl.innerHTML = renderBulkEditModalForm();
+                lucide.createIcons({ root: formEl });
+            }
+        };
+
+        window.saveBulkEdit = async () => {
+            if (!state.user || state.selectedIds.size === 0) return;
+            
+            // 找出哪些欄位被設定了
+            const updates = {};
+            Object.keys(state.bulkEdit.data).forEach(key => {
+                if (state.bulkEdit.data[key] !== null) {
+                    updates[key] = state.bulkEdit.data[key];
+                }
+            });
+
+            if (Object.keys(updates).length === 0) {
+                window.closeBulkEditModal();
+                return; // 沒有勾選任何要修改的項目
+            }
+
+            const btn = document.getElementById('bulk-save-btn');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 儲存中...'; lucide.createIcons({ root: btn }); }
+
+            try {
+                const legacyIds = [];
+                const batchGroups = {};
+
+                // 將選取的照片分為獨立照片與批次照片
+                state.selectedIds.forEach(id => {
+                    const photo = state.photos.find(p => p.id === id);
+                    if (photo) {
+                        if (photo._isBatch) {
+                            if (!batchGroups[photo.batchId]) batchGroups[photo.batchId] = [];
+                            batchGroups[photo.batchId].push(photo);
+                        } else {
+                            legacyIds.push(photo);
+                        }
+                    }
+                });
+
+                const promises = [];
+
+                // 1. 更新獨立照片
+                legacyIds.forEach(photo => {
+                    const newPhoto = { ...photo, ...updates };
+                    const contentTags = Array.isArray(newPhoto.content) ? newPhoto.content : (newPhoto.content ? [newPhoto.content] : []);
+                    const tags = [newPhoto.locationCity, newPhoto.locationDist, newPhoto.year, newPhoto.yearEdition, ...contentTags, newPhoto.issue, newPhoto.remarks].filter(Boolean);
+                    newPhoto.title = [...tags, newPhoto.customText || ''].filter(Boolean).join('-') || '未命名圖片';
+
+                    const updatePayload = { ...updates, title: newPhoto.title };
+                    promises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'photos', photo.id), updatePayload, { merge: true }));
+
+                    // 本地更新
+                    const localIndex = state.photos.findIndex(p => p.id === photo.id);
+                    if (localIndex > -1) state.photos[localIndex] = { ...state.photos[localIndex], ...updatePayload };
+                });
+
+                // 2. 更新批次陣列照片
+                Object.keys(batchGroups).forEach(batchId => {
+                    const photosToUpdate = batchGroups[batchId];
+                    const batchRef = doc(db, 'artifacts', appId, 'public', 'data', 'photo_batches', batchId);
+                    
+                    promises.push(runTransaction(db, async (transaction) => {
+                        const batchDoc = await transaction.get(batchRef);
+                        if (batchDoc.exists()) {
+                            const items = batchDoc.data().items || [];
+                            let changed = false;
+                            
+                            photosToUpdate.forEach(photo => {
+                                const itemIndex = items.findIndex(i => i.id === photo.id);
+                                if (itemIndex > -1) {
+                                    const newPhoto = { ...items[itemIndex], ...updates };
+                                    const contentTags = Array.isArray(newPhoto.content) ? newPhoto.content : (newPhoto.content ? [newPhoto.content] : []);
+                                    const tags = [newPhoto.locationCity, newPhoto.locationDist, newPhoto.year, newPhoto.yearEdition, ...contentTags, newPhoto.issue, newPhoto.remarks].filter(Boolean);
+                                    newPhoto.title = [...tags, newPhoto.customText || ''].filter(Boolean).join('-') || '未命名圖片';
+
+                                    items[itemIndex] = newPhoto;
+                                    changed = true;
+
+                                    // 本地更新
+                                    const localIndex = state.photos.findIndex(p => p.id === photo.id);
+                                    if (localIndex > -1) state.photos[localIndex] = { ...state.photos[localIndex], ...newPhoto };
+                                }
+                            });
+                            if (changed) transaction.update(batchRef, { items });
+                        }
+                    }));
+                });
+
+                await Promise.all(promises);
+
+                window.closeBulkEditModal();
+                state.isSelectionMode = false;
+                state.selectedIds.clear();
+                updateGallery();
+                updateMoodBoard();
+
+            } catch (err) {
+                console.error("Batch update error:", err);
+                alert("批次修改發生錯誤");
+                if (btn) { btn.disabled = false; btn.innerText = '確認套用變更'; }
+            }
         };
 
         window.updateNewTagValue = (val) => { state.newTagValue = val; };
