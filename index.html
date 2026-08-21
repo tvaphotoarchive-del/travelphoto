@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TravelLens 旅遊視覺資產管理 (美學優化與批次管理版)</title>
+    <title>TravelLens 旅遊視覺資產管理</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -16,24 +16,21 @@
         .animate-popIn { animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .scan-line { animation: scan 1.5s ease-in-out infinite alternate; }
         
-        /* 優化捲軸樣式，使其更隱形現代 */
         .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        /* 隱藏原生 details 的箭頭 */
         details > summary { list-style: none; }
         details > summary::-webkit-details-marker { display: none; }
     </style>
 </head>
 <body class="bg-slate-50 font-sans text-slate-800 antialiased selection:bg-blue-200 selection:text-blue-900">
 
-    <!-- === STREAMING_CHUNK:Building the Login Screen... === -->
     <div id="login-screen" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-lg transition-opacity duration-500 px-4">
         <div class="bg-white/90 backdrop-blur-xl rounded-3xl p-8 w-full max-w-sm shadow-2xl transform transition-all animate-popIn text-center border border-white/40">
             <div class="h-24 flex items-center justify-center mx-auto mb-4 transform hover:scale-105 transition-transform">
-                <img src="image_baefbd.png" alt="台灣觀光協會 TVA Logo" class="h-full object-contain drop-shadow-sm" onerror="this.src='https://placehold.co/200x80/ffffff/333333?text=TravelLens'" />
+                <img src="image_baefbd.png" alt="TravelLens Logo" class="h-full object-contain drop-shadow-sm" onerror="this.src='https://placehold.co/200x80/ffffff/333333?text=TravelLens'" />
             </div>
             <h2 class="text-3xl font-extrabold tracking-tight text-slate-900 mb-2">TravelLens</h2>
             <p class="text-sm text-slate-500 mb-8 font-medium">旅遊視覺資產管理系統</p>
@@ -50,14 +47,11 @@
         </div>
     </div>
 
-    <!-- === STREAMING_CHUNK:Laying out the Main Application Grid... === -->
     <div class="flex flex-col md:flex-row h-screen relative hidden overflow-hidden" id="app">
-        
-        <!-- 1. 左側過濾面板 -->
         <aside class="w-full md:w-72 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 z-20 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] relative">
             <div class="p-6 border-b border-slate-100 shrink-0 bg-white/80 backdrop-blur-md">
                 <div class="flex items-center gap-3 mb-1">
-                    <img src="image_baefbd.png" alt="TVA" class="h-8 w-auto object-contain" onerror="this.style.display='none'" />
+                    <img src="image_baefbd.png" alt="Logo" class="h-8 w-auto object-contain" onerror="this.style.display='none'" />
                     <h1 class="text-2xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
                         TravelLens
                     </h1>
@@ -74,21 +68,14 @@
             </div>
         </aside>
 
-        <!-- 2. 中央照片網格與頂部工具列 -->
         <main class="w-full md:flex-1 flex flex-col h-full z-10 bg-slate-50/50 shrink-0 min-w-0">
-            <!-- 頂部動態工具列 -->
             <header class="h-16 bg-white/70 backdrop-blur-lg border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-20 shadow-sm sticky top-0">
                 <div id="gallery-stats" class="flex items-center gap-2 text-sm font-semibold text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm"></div>
-                <div id="header-actions" class="flex items-center gap-3">
-                    <!-- 動態渲染工具列按鈕 -->
-                </div>
+                <div id="header-actions" class="flex items-center gap-3"></div>
             </header>
-            
-            <!-- 畫廊本體 -->
             <div id="gallery-container" class="flex-1 overflow-y-auto p-6 custom-scrollbar relative"></div>
         </main>
 
-        <!-- 3. 右側企劃板 -->
         <aside class="w-full md:w-80 bg-white border-l border-slate-200 flex flex-col h-full z-20 shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.1)] shrink-0">
             <div class="p-6 border-b border-slate-100 bg-white shrink-0">
                 <h2 class="text-lg font-bold text-slate-900 flex items-center justify-between mb-4">
@@ -109,18 +96,26 @@
     </div>
 
     <!-- Modals Container -->
+    <div id="toast-container" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] transition-all duration-300 transform translate-y-20 opacity-0 pointer-events-none flex items-center gap-4 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3.5 rounded-2xl shadow-2xl shadow-slate-900/20 border border-slate-700">
+        <i data-lucide="info" class="w-5 h-5 text-blue-400 shrink-0"></i>
+        <span id="toast-message" class="text-sm font-bold tracking-wide whitespace-nowrap"></span>
+        <div id="toast-action-container" class="border-l border-slate-700 pl-4 ml-1">
+            <button id="toast-action-btn" class="text-sm font-extrabold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest pointer-events-auto active:scale-95 transform whitespace-nowrap"></button>
+        </div>
+    </div>
     <div id="modals-container"></div>
 
-    <!-- === STREAMING_CHUNK:Initializing Firebase and Core State... === -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, doc, setDoc, getDocs, query, orderBy, runTransaction, limit, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, onSnapshot, doc, setDoc, getDoc, getDocs, query, orderBy, runTransaction, limit, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getStorage, ref, uploadString, getDownloadURL } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js';
 
-        const firebaseConfig = typeof __firebase_config !== 'undefined' && __firebase_config ? JSON.parse(__firebase_config) : {
+        const firebaseConfig = {
             apiKey: "AIzaSyAfB6THM5bJNd5wsBwpabMCkEak80xcMrc",
             authDomain: "photo-ed222.firebaseapp.com",
             projectId: "photo-ed222",
+            storageBucket: "photo-ed222.firebasestorage.app", 
         };
 
         const app = initializeApp(firebaseConfig);
@@ -128,36 +123,27 @@
         const db = initializeFirestore(app, {
             localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
         });
+        const storage = getStorage(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'travel-lens-prod';
 
         const state = {
-            user: null,
+            user: null, 
             photos: [], 
             displayLimit: 30,
             categories: {
                 content: ['景點','娛樂','餐飲','住宿','交通','自然','人文'], 
-                yearHierarchy: {
-                    '2026': ['日文刊', '韓文刊', '繁中刊'],
-                    '2027': [],
-                    '2028': []
-                },
+                yearHierarchy: { '2026': ['日文刊', '韓文刊', '繁中刊'], '2027': [], '2028': [] },
                 issue: ['Vol.12', 'Vol.13', 'Vol.14'],
                 remarks: ['空拍', '夜景', '人像', '特殊企劃'], 
                 locationHierarchy: {
-                    '台灣-花蓮': ['花蓮市', '吉安鄉', '秀林鄉'],
-                    '台灣-墾丁': ['恆春鎮'],
-                    '日本-東京': ['新宿區', '澀谷區'],
-                    '日本-北海道': [],
-                    '法國-巴黎': []
+                    '台灣-花蓮': ['花蓮市', '吉安鄉', '秀林鄉'], '台灣-墾丁': ['恆春鎮'], '日本-東京': ['新宿區', '澀谷區'], '日本-北海道': [], '法國-巴黎': []
                 }
             },
             searchQuery: '',
             filters: { content: [], year: [], yearEdition: [], issue: [], remarks: [], locationCity: [], locationDist: [] }, 
             moodBoard: [],
-            
             isSelectionMode: false,
             selectedIds: new Set(),
-            
             isLoading: true,
             isBatchModalOpen: false,
             batchStatus: 'idle',
@@ -171,6 +157,46 @@
         let unsubTags = null;
         let loadMoreObserver = null;
         let searchTimeout = null;
+
+        // Toast 復原機制狀態
+        let toastTimeoutId = null;
+        let toastFinalAction = null;
+
+        window.showToast = (message, actionText, onUndo, onFinalize, duration = 6000) => {
+            const container = document.getElementById('toast-container');
+            const msgEl = document.getElementById('toast-message');
+            const btn = document.getElementById('toast-action-btn');
+            const actionContainer = document.getElementById('toast-action-container');
+
+            // 如果還有上一個未執行的終局操作，立刻執行
+            if (toastFinalAction) { toastFinalAction(); toastFinalAction = null; }
+            clearTimeout(toastTimeoutId);
+
+            msgEl.textContent = message;
+            if (actionText && onUndo) {
+                actionContainer.classList.remove('hidden');
+                btn.textContent = actionText;
+                btn.onclick = () => {
+                    clearTimeout(toastTimeoutId); toastFinalAction = null; onUndo(); window.hideToast();
+                };
+            } else { actionContainer.classList.add('hidden'); }
+
+            toastFinalAction = onFinalize;
+            container.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+            container.classList.add('translate-y-0', 'opacity-100');
+
+            // 倒數結束執行真正刪除
+            toastTimeoutId = setTimeout(() => {
+                if (toastFinalAction) { toastFinalAction(); toastFinalAction = null; }
+                window.hideToast();
+            }, duration);
+        };
+
+        window.hideToast = () => {
+            const container = document.getElementById('toast-container');
+            container.classList.remove('translate-y-0', 'opacity-100');
+            container.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+        };
 
         function updateGallery() { renderGallery(); }
         function updateMoodBoard() { renderMoodBoard(); }
@@ -203,26 +229,31 @@
         };
 
         async function initApp() {
-            state.user = { uid: auth.currentUser?.uid || localStorage.getItem('travelLensUid') }; 
+            state.user = { uid: auth.currentUser?.uid || localStorage.getItem('travelLensUid'), role: 'uploader' }; 
             renderAuthStatus();
             
             try {
+                const roleRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', state.user.uid);
+                const roleSnap = await getDoc(roleRef);
+                if (roleSnap.exists()) {
+                    // 更新：移除 downloader 角色
+                    state.user.role = roleSnap.data().role || 'uploader'; // admin, senior_editor, editor, or uploader
+                }
+                renderAuthStatus();
+
                 const tagsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'tags_v2');
                 unsubTags = onSnapshot(tagsRef, (docSnap) => {
                     if (docSnap.exists()) { 
                         const data = docSnap.data();
-                        // 遷移舊的 year 陣列至 yearHierarchy
                         if (data.year && Array.isArray(data.year) && !data.yearHierarchy) {
-                            data.yearHierarchy = {};
-                            data.year.forEach(y => data.yearHierarchy[y] = []);
-                            delete data.year;
+                            data.yearHierarchy = {}; data.year.forEach(y => data.yearHierarchy[y] = []); delete data.year;
                         }
                         state.categories = { ...state.categories, ...data }; 
                         if (!state.categories.remarks) state.categories.remarks = [];
-                        updateFilters(); 
-                        updateModals(); 
+                        updateFilters(); updateModals(); 
                     }
                 });
+                
                 window.loadPhotos();
             } catch (err) { console.error("Init Error:", err); }
         }
@@ -242,16 +273,18 @@
                         data.items.forEach(item => batchPhotos.push({ ...item, batchId: docSnap.id, _isBatch: true }));
                     }
                 });
+
                 const legacyRef = collection(db, 'artifacts', appId, 'public', 'data', 'photos');
-                const oldSnap = await getDocs(query(legacyRef, orderBy('createdAt', 'desc'), limit(1000)));
+                const oldSnap = await getDocs(legacyRef);
                 oldSnap.forEach(docSnap => legacyPhotos.push({ id: docSnap.id, ...docSnap.data(), _isBatch: false }));
 
                 state.photos = [...batchPhotos, ...legacyPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
             } catch (error) {
                 console.error("Load photos error:", error);
                 const container = document.getElementById('gallery-container');
                 if (container) {
-                    container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-rose-500 py-10 animate-fadeIn"><i data-lucide="shield-alert" class="w-12 h-12 mb-4"></i><p class="font-bold">讀取圖庫失敗，請檢查資料庫權限或網路連線</p><p class="text-xs mt-2 opacity-80">${error.message}</p></div>`;
+                    container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-rose-500 py-10 animate-fadeIn"><i data-lucide="shield-alert" class="w-12 h-12 mb-4"></i><p class="font-bold">讀取圖庫失敗</p><p class="text-xs mt-2 opacity-80">${error.message}</p></div>`;
                     lucide.createIcons({ root: container });
                 }
             } finally {
@@ -263,11 +296,14 @@
 
         function renderAuthStatus() {
             const el = document.getElementById('auth-status'); 
-            if (state.user) el.innerHTML = `<span class="flex items-center text-emerald-600 uppercase"><div class="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5 animate-pulse"></div> 雲端已連線</span>`;
+            // 更新：移除 downloader 對應名稱
+            const roleMap = { 'admin': '管理員', 'senior_editor': '資深編輯', 'editor': '編輯', 'uploader': '上傳者' };
+            const roleName = state.user ? roleMap[state.user.role] : '';
+
+            if (state.user) el.innerHTML = `<span class="flex items-center text-emerald-600 uppercase"><div class="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5 animate-pulse"></div> 雲端連線中 (${roleName})</span>`;
             else el.innerHTML = `<span class="flex items-center text-rose-500 uppercase"><div class="w-1.5 h-1.5 bg-rose-500 rounded-full mr-1.5"></div> 連線中...</span>`;
         }
 
-        // === STREAMING_CHUNK:Rendering Smart Filters (Zero Flash)... ===
         function updateFilters() {
             const detailsStates = {};
             document.querySelectorAll('details.loc-group').forEach(el => {
@@ -288,7 +324,7 @@
             <div class="mb-2">
                 <h3 class="text-[11px] font-bold tracking-widest text-slate-400 mb-3 flex items-center justify-between uppercase">
                     <div class="flex items-center gap-1.5"><i data-lucide="calendar" class="w-3.5 h-3.5"></i> 發行年份與刊物</div>
-                    <button onclick="window.openAddTagModal('year')" class="text-slate-400 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 p-1 rounded-md transition-colors" title="新增年份"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                    ${state.user?.role === 'admin' || state.user?.role === 'senior_editor' ? `<button onclick="window.openAddTagModal('year')" class="text-slate-400 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 p-1 rounded-md transition-colors" title="新增年份"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
                 </h3>
             `;
             
@@ -310,8 +346,8 @@
                             </label>
                         </div>
                         <div class="flex items-center gap-1 opacity-0 group-hover/details:opacity-100 shrink-0">
-                            <button onclick="event.preventDefault(); window.openAddTagModal('yearEdition', '${year}')" class="text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-indigo-50" title="在此新增語系/刊物"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
-                            <button onclick="event.preventDefault(); window.handleDeleteTag('year', '${year}')" class="text-slate-400 hover:text-rose-500 p-1 rounded hover:bg-rose-50" title="刪除"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            ${state.user?.role === 'admin' || state.user?.role === 'senior_editor' ? `<button onclick="event.preventDefault(); window.openAddTagModal('yearEdition', '${year}')" class="text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-indigo-50" title="在此新增語系/刊物"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>` : ''}
+                            ${state.user?.role === 'admin' ? `<button onclick="event.preventDefault(); window.handleDeleteTag('year', '${year}')" class="text-slate-400 hover:text-rose-500 p-1 rounded hover:bg-rose-50" title="刪除"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}
                         </div>
                     </summary>
                     <div class="pl-8 mt-1 space-y-1 mb-3 relative before:absolute before:left-4 before:top-0 before:bottom-2 before:w-px before:bg-slate-200">
@@ -330,7 +366,7 @@
                                 </div>
                                 <span class="text-sm font-medium truncate ${isEdChecked ? 'text-slate-900' : 'text-slate-500'}">${ed}</span>
                             </label>
-                            <button onclick="window.handleDeleteTag('yearEdition', '${year}|${ed}', event)" class="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-50"><i data-lucide="x" class="w-3 h-3"></i></button>
+                            ${state.user?.role === 'admin' ? `<button onclick="window.handleDeleteTag('yearEdition', '${year}|${ed}', event)" class="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-50"><i data-lucide="x" class="w-3 h-3"></i></button>` : ''}
                         </div>`;
                     });
                 }
@@ -343,7 +379,7 @@
             <div class="mb-2">
                 <h3 class="text-[11px] font-bold tracking-widest text-slate-400 mb-3 flex items-center justify-between uppercase">
                     <div class="flex items-center gap-1.5"><i data-lucide="map-pin" class="w-3.5 h-3.5"></i> 地理位置</div>
-                    <button onclick="window.openAddTagModal('locationCity')" class="text-slate-400 hover:text-emerald-600 bg-slate-100 hover:bg-emerald-50 p-1 rounded-md transition-colors" title="新增國家/縣市"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                    ${state.user?.role === 'admin' || state.user?.role === 'senior_editor' ? `<button onclick="window.openAddTagModal('locationCity')" class="text-slate-400 hover:text-emerald-600 bg-slate-100 hover:bg-emerald-50 p-1 rounded-md transition-colors" title="新增國家/縣市"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
                 </h3>
             `;
             
@@ -365,8 +401,8 @@
                             </label>
                         </div>
                         <div class="flex items-center gap-1 opacity-0 group-hover/details:opacity-100 shrink-0">
-                            <button onclick="event.preventDefault(); window.openAddTagModal('locationDist', '${city}')" class="text-slate-400 hover:text-emerald-600 p-1 rounded hover:bg-emerald-50" title="在此新增鄉鎮區"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
-                            <button onclick="event.preventDefault(); window.handleDeleteTag('locationCity', '${city}')" class="text-slate-400 hover:text-rose-500 p-1 rounded hover:bg-rose-50" title="刪除"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            ${state.user?.role === 'admin' || state.user?.role === 'senior_editor' ? `<button onclick="event.preventDefault(); window.openAddTagModal('locationDist', '${city}')" class="text-slate-400 hover:text-emerald-600 p-1 rounded hover:bg-emerald-50" title="在此新增鄉鎮區"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>` : ''}
+                            ${state.user?.role === 'admin' ? `<button onclick="event.preventDefault(); window.handleDeleteTag('locationCity', '${city}')" class="text-slate-400 hover:text-rose-500 p-1 rounded hover:bg-rose-50" title="刪除"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}
                         </div>
                     </summary>
                     <div class="pl-8 mt-1 space-y-1 mb-3 relative before:absolute before:left-4 before:top-0 before:bottom-2 before:w-px before:bg-slate-200">
@@ -385,7 +421,7 @@
                                 </div>
                                 <span class="text-sm font-medium truncate ${isDistChecked ? 'text-slate-900' : 'text-slate-500'}">${dist}</span>
                             </label>
-                            <button onclick="window.handleDeleteTag('locationDist', '${city}|${dist}', event)" class="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-50"><i data-lucide="x" class="w-3 h-3"></i></button>
+                            ${state.user?.role === 'admin' ? `<button onclick="window.handleDeleteTag('locationDist', '${city}|${dist}', event)" class="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-50"><i data-lucide="x" class="w-3 h-3"></i></button>` : ''}
                         </div>`;
                     });
                 }
@@ -395,7 +431,6 @@
             
             container.innerHTML = html;
             lucide.createIcons();
-            
             requestAnimationFrame(() => { container.scrollTop = scrollTop; });
         }
 
@@ -404,7 +439,7 @@
             <div class="mb-6">
                 <h3 class="text-[11px] font-bold tracking-widest text-slate-400 mb-3 flex items-center justify-between uppercase">
                     <div class="flex items-center gap-1.5"><i data-lucide="${icon}" class="w-3.5 h-3.5"></i> ${title}</div>
-                    <button onclick="window.openAddTagModal('${id}')" class="text-slate-400 hover:text-${color}-600 bg-slate-100 hover:bg-${color}-50 p-1 rounded-md transition-colors" title="新增標籤"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                    ${state.user?.role === 'admin' || state.user?.role === 'senior_editor' ? `<button onclick="window.openAddTagModal('${id}')" class="text-slate-400 hover:text-${color}-600 bg-slate-100 hover:bg-${color}-50 p-1 rounded-md transition-colors" title="新增標籤"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
                 </h3>
             `;
             (options || []).forEach(cat => {
@@ -417,9 +452,11 @@
                         </div>
                         <span class="text-sm font-semibold truncate ${isChecked ? 'text-slate-900' : 'text-slate-600'}">${cat}</span>
                     </label>
+                    ${state.user?.role === 'admin' ? `
                     <button onclick="window.handleDeleteTag('${id}', '${cat}', event)" class="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-rose-50" title="刪除標籤">
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                     </button>
+                    ` : ''}
                 </div>`;
             });
             html += `</div>`;
@@ -435,12 +472,16 @@
                     <div class="flex items-center bg-blue-50 text-blue-700 px-3.5 py-2 rounded-xl border border-blue-100 mr-2 text-sm font-bold shadow-sm animate-popIn">
                         已選取 ${state.selectedIds.size} 張
                     </div>
+                    ${state.user?.role === 'admin' || state.user?.role === 'senior_editor' || state.user?.role === 'editor' ? `
                     <button onclick="window.openBulkEditModal()" class="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-md transform active:scale-95 mr-2 ${state.selectedIds.size === 0 ? 'opacity-50 cursor-not-allowed saturate-0' : ''}" ${state.selectedIds.size === 0 ? 'disabled' : ''}>
                         <i data-lucide="tags" class="w-4 h-4"></i> 批次標籤
                     </button>
+                    ` : ''}
+                    ${state.user?.role === 'admin' ? `
                     <button onclick="window.handleBatchDelete()" class="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-md transform active:scale-95 ${state.selectedIds.size === 0 ? 'opacity-50 cursor-not-allowed saturate-0' : ''}" ${state.selectedIds.size === 0 ? 'disabled' : ''}>
                         <i data-lucide="trash-2" class="w-4 h-4"></i> 批次刪除
                     </button>
+                    ` : ''}
                     <button onclick="window.toggleSelectionMode()" class="px-5 py-2 text-sm text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl font-bold transition-all transform active:scale-95 ml-2">
                         取消
                     </button>
@@ -473,12 +514,7 @@
                 const selIcon = document.getElementById(`sel-icon-${id}`);
                 let isSelected = false;
 
-                if (state.selectedIds.has(id)) {
-                    state.selectedIds.delete(id);
-                } else {
-                    state.selectedIds.add(id);
-                    isSelected = true;
-                }
+                if (state.selectedIds.has(id)) { state.selectedIds.delete(id); } else { state.selectedIds.add(id); isSelected = true; }
 
                 if (card) {
                     if (isSelected) {
@@ -489,9 +525,7 @@
                         card.classList.add('hover:shadow-xl', 'border-slate-200');
                     }
                 }
-                if (selIcon) {
-                    selIcon.className = isSelected ? 'absolute inset-0 bg-blue-500/10 border-[6px] border-blue-500 rounded-2xl z-20 flex items-start justify-start p-3 transition-all' : 'hidden';
-                }
+                if (selIcon) { selIcon.className = isSelected ? 'absolute inset-0 bg-blue-500/10 border-[6px] border-blue-500 rounded-2xl z-20 flex items-start justify-start p-3 transition-all' : 'hidden'; }
                 renderHeaderActions();
             } else {
                 window.openEditModal(id);
@@ -506,12 +540,7 @@
             const index = state.moodBoard.findIndex(p => p.id === photoId);
             let isNowSelected = false;
 
-            if (index > -1) {
-                state.moodBoard.splice(index, 1);
-            } else {
-                state.moodBoard.push(photo);
-                isNowSelected = true;
-            }
+            if (index > -1) { state.moodBoard.splice(index, 1); } else { state.moodBoard.push(photo); isNowSelected = true; }
 
             const btn = document.getElementById(`mb-btn-${photoId}`);
             if (btn) {
@@ -527,7 +556,6 @@
             updateMoodBoard(); 
         };
 
-        // === STREAMING_CHUNK:Rendering Main Gallery Grid... ===
         function renderGallery() {
             renderHeaderActions();
             const container = document.getElementById('gallery-container');
@@ -539,13 +567,11 @@
                                     (photo.locationCity || '').toLowerCase().includes(searchTxt) ||
                                     (photo.locationDist || '').toLowerCase().includes(searchTxt);
                 
-                // 多選內容判斷
                 const contentTags = Array.isArray(photo.content) ? photo.content : (photo.content ? [photo.content] : []);
                 const matchContent = state.filters.content.length === 0 || state.filters.content.some(c => contentTags.includes(c));
                 const matchIssue = state.filters.issue.length === 0 || state.filters.issue.includes(photo.issue);
                 const matchRemarks = state.filters.remarks.length === 0 || (photo.remarks && state.filters.remarks.includes(photo.remarks));
                 
-                // 巢狀年份判斷
                 let matchYear = true;
                 if (state.filters.year.length > 0 || state.filters.yearEdition.length > 0) {
                     const yMatch = state.filters.year.includes(photo.year);
@@ -583,7 +609,6 @@
                 const locDisplay = [photo.locationCity, photo.locationDist].filter(Boolean).join(', ');
                 const yearDisplay = [photo.year, photo.yearEdition].filter(Boolean).join(' | ');
                 
-                // 動態產生多選內容標籤
                 const contentTags = Array.isArray(photo.content) ? photo.content : (photo.content ? [photo.content] : []);
                 const contentDisplay = contentTags.map(c => `<span class="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded text-slate-600"><i data-lucide="bookmark" class="w-3 h-3"></i> ${c}</span>`).join('');
                 
@@ -597,16 +622,19 @@
                         </div>
 
                         <div class="relative aspect-[4/3] bg-slate-200 overflow-hidden shrink-0">
-                            <img src="${photo.url}" loading="lazy" alt="${photo.title}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                            <!-- 更新：加入禁用右鍵與拖曳的屬性 -->
+                            <img src="${photo.url}" loading="lazy" alt="${photo.title}" oncontextmenu="return false;" draggable="false" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none select-none" />
                             <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent pointer-events-none z-10"></div>
                             
                             ${!state.isSelectionMode ? `
                                 <button id="mb-btn-${photo.id}" onclick="window.toggleMoodBoard('${photo.id}', event)" class="absolute top-3 right-3 p-2.5 rounded-full shadow-lg z-30 transition-all transform hover:scale-110 ${inMoodboard ? 'bg-blue-600 text-white' : 'bg-white/90 backdrop-blur text-slate-700 hover:bg-white'}">
                                     <i data-lucide="${inMoodboard ? 'check' : 'plus'}" class="w-4 h-4"></i>
                                 </button>
+                                ${state.user?.role === 'admin' || state.user?.role === 'senior_editor' || state.user?.role === 'editor' ? `
                                 <button onclick="window.handlePhotoClick('${photo.id}')" class="absolute top-3 left-3 p-2.5 rounded-full bg-slate-900/60 text-white shadow-lg backdrop-blur opacity-0 group-hover:opacity-100 z-30 transition-all hover:bg-slate-900 transform hover:scale-110">
                                     <i data-lucide="pencil" class="w-4 h-4"></i>
                                 </button>
+                                ` : ''}
                             ` : ''}
 
                             <div class="absolute bottom-3 left-3 flex gap-1.5 z-20">
@@ -661,6 +689,7 @@
             state.displayLimit = 30; document.getElementById('gallery-container').scrollTop = 0;
             updateFilters(); updateGallery();
         };
+        
         window.clearFilters = () => {
             state.filters = { content: [], year: [], yearEdition: [], issue: [], remarks: [], locationCity: [], locationDist: [] };
             state.searchQuery = ''; document.getElementById('searchInput').value = '';
@@ -670,59 +699,71 @@
 
         window.handleBatchDelete = () => {
             if (state.selectedIds.size === 0) return;
+            if (state.user?.role !== 'admin') { alert("權限不足：只有管理員可以刪除照片。"); return; }
+
             state.confirmDialog = {
                 isOpen: true, 
-                message: `確定要刪除這 ${state.selectedIds.size} 張照片嗎？\n(此操作無法復原，並將從所有企劃板中移除)`, 
+                message: `確定要刪除這 ${state.selectedIds.size} 張照片嗎？\n(系統將提供 6 秒的「復原」時間，超時將永久刪除)`, 
                 isPrimary: false,
-                action: async () => {
-                    state.confirmDialog.isLoading = true;
-                    updateModals();
+                action: () => {
+                    const idsToDelete = Array.from(state.selectedIds);
+                    const photosToDelete = state.photos.filter(p => idsToDelete.includes(p.id));
+                    const moodboardToDelete = state.moodBoard.filter(p => idsToDelete.includes(p.id));
+
+                    // 1. 視覺上先移除，營造即時感
+                    state.photos = state.photos.filter(p => !idsToDelete.includes(p.id));
+                    state.moodBoard = state.moodBoard.filter(p => !idsToDelete.includes(p.id));
+                    state.selectedIds.clear();
+                    state.isSelectionMode = false;
                     
-                    try {
-                        const legacyIds = [];
-                        const batchGroups = {}; 
-                        
-                        state.selectedIds.forEach(id => {
-                            const photo = state.photos.find(p => p.id === id);
-                            if (photo) {
+                    window.closeConfirmDialog();
+                    updateGallery(); 
+                    updateMoodBoard(); 
+                    
+                    // 2. 顯示 Toast 與復原按鈕
+                    window.showToast(`已刪除 ${idsToDelete.length} 張照片`, '復原', () => {
+                        // 點擊復原：把照片加回來
+                        state.photos = [...photosToDelete, ...state.photos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                        state.moodBoard = [...state.moodBoard, ...moodboardToDelete];
+                        updateGallery(); 
+                        updateMoodBoard();
+                    }, async () => {
+                        // 倒數結束：真正執行 Firestore 的刪除
+                        try {
+                            const legacyIds = [];
+                            const batchGroups = {}; 
+                            
+                            photosToDelete.forEach(photo => {
                                 if (photo._isBatch) {
                                     if (!batchGroups[photo.batchId]) batchGroups[photo.batchId] = [];
-                                    batchGroups[photo.batchId].push(id);
+                                    batchGroups[photo.batchId].push(photo.id);
                                 } else {
-                                    legacyIds.push(id);
+                                    legacyIds.push(photo.id);
                                 }
-                            }
-                        });
+                            });
 
-                        const promises = [];
-                        legacyIds.forEach(id => { promises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'photos', id))); });
-                        Object.keys(batchGroups).forEach(batchId => {
-                            const idsToRemove = batchGroups[batchId];
-                            const batchRef = doc(db, 'artifacts', appId, 'public', 'data', 'photo_batches', batchId);
-                            promises.push(runTransaction(db, async (transaction) => {
-                                const batchDoc = await transaction.get(batchRef);
-                                if (batchDoc.exists()) {
-                                    const items = batchDoc.data().items || [];
-                                    const newItems = items.filter(i => !idsToRemove.includes(i.id));
-                                    if (newItems.length === 0) transaction.delete(batchRef);
-                                    else transaction.update(batchRef, { items: newItems });
-                                }
-                            }));
-                        });
+                            const promises = [];
+                            legacyIds.forEach(id => { promises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'photos', id))); });
+                            Object.keys(batchGroups).forEach(batchId => {
+                                const idsToRemove = batchGroups[batchId];
+                                const batchRef = doc(db, 'artifacts', appId, 'public', 'data', 'photo_batches', batchId);
+                                promises.push(runTransaction(db, async (transaction) => {
+                                    const batchDoc = await transaction.get(batchRef);
+                                    if (batchDoc.exists()) {
+                                        const items = batchDoc.data().items || [];
+                                        const newItems = items.filter(i => !idsToRemove.includes(i.id));
+                                        if (newItems.length === 0) transaction.delete(batchRef);
+                                        else transaction.update(batchRef, { items: newItems });
+                                    }
+                                }));
+                            });
 
-                        await Promise.all(promises);
-
-                        state.photos = state.photos.filter(p => !state.selectedIds.has(p.id));
-                        state.moodBoard = state.moodBoard.filter(p => !state.selectedIds.has(p.id));
-                        state.selectedIds.clear();
-                        state.isSelectionMode = false;
-                        
-                        updateGallery(); updateMoodBoard(); window.closeConfirmDialog();
-                    } catch (error) {
-                        console.error("Batch delete error:", error);
-                        alert("批量刪除過程中發生錯誤");
-                        window.closeConfirmDialog();
-                    }
+                            await Promise.all(promises);
+                        } catch (error) {
+                            console.error("Batch delete error:", error);
+                            alert("背景刪除過程中發生錯誤");
+                        }
+                    });
                 }
             };
             updateModals();
@@ -736,6 +777,9 @@
 
             const currentYear = document.getElementById('project-year')?.value || '';
             const currentIssue = document.getElementById('project-issue')?.value || '';
+
+            // 更新下載權限判斷：admin 和 senior_editor 可以下載
+            const canDownload = state.user?.role === 'admin' || state.user?.role === 'senior_editor';
 
             settingsContainer.innerHTML = `
                 <div class="flex-1">
@@ -758,6 +802,7 @@
             if (state.moodBoard.length === 0) {
                 container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center text-slate-400 space-y-3 px-4 py-8"><div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center"><i data-lucide="folder-plus" class="w-8 h-8 text-slate-300"></i></div><p class="text-sm font-semibold text-slate-500">尚未加入任何素材<br/><span class="text-xs text-slate-400 font-normal">點擊照片上的 + 號加入</span></p></div>`;
                 btn.disabled = true; btn.className = "w-full py-3.5 rounded-xl text-sm font-bold transition-all bg-slate-100 text-slate-400 cursor-not-allowed";
+                btn.innerHTML = '打包下載 (ZIP)';
             } else {
                 let html = '';
                 state.moodBoard.forEach(photo => {
@@ -776,12 +821,22 @@
                     </div>`;
                 });
                 container.innerHTML = html;
-                btn.disabled = false; btn.innerHTML = '打包為 ZIP 下載'; btn.className = "w-full py-3.5 rounded-xl text-sm font-bold transition-all bg-slate-900 text-white hover:bg-slate-800 shadow-lg hover:shadow-slate-500/30 transform active:scale-[0.98]";
+                
+                if (canDownload) {
+                    btn.disabled = false; btn.innerHTML = '打包為 ZIP 下載'; btn.className = "w-full py-3.5 rounded-xl text-sm font-bold transition-all bg-slate-900 text-white hover:bg-slate-800 shadow-lg hover:shadow-slate-500/30 transform active:scale-[0.98]";
+                } else {
+                    btn.disabled = true; btn.innerHTML = '<i data-lucide="lock" class="w-4 h-4 inline mr-1"></i> 請聯絡管理員索取原檔'; btn.className = "w-full py-3.5 rounded-xl text-sm font-bold transition-all bg-slate-100 text-slate-400 cursor-not-allowed";
+                }
             }
             lucide.createIcons({ root: document.getElementById('moodboard-items') });
+            lucide.createIcons({ root: btn });
         }
 
         window.handleExport = () => {
+            // 更新防呆保護：檢查 admin 和 senior_editor 的下載權限
+            if (state.user?.role !== 'admin' && state.user?.role !== 'senior_editor') {
+                alert("權限不足：您沒有下載原檔的權限，請聯絡管理員。"); return;
+            }
             if (state.moodBoard.length === 0) return;
             const year = document.getElementById('project-year').value || '未定年份';
             const issue = document.getElementById('project-issue').value || '未定期數';
@@ -826,7 +881,6 @@
             </div>`;
         }
 
-        // 新增支援多選的 Pill Group (用於內容分類等)
         function createMultiPillGroup(onClickFnName, idOrNull, field, options, selectedValues, colorClassActive) {
             const sels = Array.isArray(selectedValues) ? selectedValues : (selectedValues ? [selectedValues] : []);
             return `<div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar pr-1 pb-1">
@@ -846,6 +900,7 @@
             const distOpts = item.suggestions.locationCity ? state.categories.locationHierarchy[item.suggestions.locationCity] : [];
             const yearOpts = Object.keys(state.categories.yearHierarchy || {});
             const editionOpts = item.suggestions.year ? (state.categories.yearHierarchy[item.suggestions.year] || []) : [];
+            const canAddTag = state.user?.role === 'admin' || state.user?.role === 'senior_editor';
             
             return `
                 <div class="flex flex-col gap-2 mb-4">
@@ -862,42 +917,42 @@
                     <div>
                         <div class="flex items-center justify-between mb-2">
                             <label class="text-[10px] uppercase tracking-wider font-bold text-slate-500">國家/縣市</label>
-                            <button onclick="window.openAddTagModal('locationCity')" class="text-emerald-500 hover:text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md" title="新增國家/縣市"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                            ${canAddTag ? `<button onclick="window.openAddTagModal('locationCity')" class="text-emerald-500 hover:text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
                         </div>
                         ${createPillGroup('updateBatchItem', item.id, 'locationCity', cityOpts, item.suggestions.locationCity, 'bg-emerald-100 border-emerald-300 text-emerald-800')}
                     </div>
                     <div>
                         <div class="flex items-center justify-between mb-2">
                             <label class="text-[10px] uppercase tracking-wider font-bold text-slate-500">鄉鎮市區</label>
-                            ${item.suggestions.locationCity ? `<button onclick="window.openAddTagModal('locationDist', '${item.suggestions.locationCity}')" class="text-emerald-500 hover:text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md" title="在此新增"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
+                            ${item.suggestions.locationCity && canAddTag ? `<button onclick="window.openAddTagModal('locationDist', '${item.suggestions.locationCity}')" class="text-emerald-500 hover:text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
                         </div>
-                        ${item.suggestions.locationCity ? (distOpts.length > 0 ? createPillGroup('updateBatchItem', item.id, 'locationDist', distOpts, item.suggestions.locationDist, 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-2">無子區域選項，請新增</p>') : '<p class="text-[11px] font-bold text-slate-400 py-2">請先選擇左側縣市</p>'}
+                        ${item.suggestions.locationCity ? (distOpts.length > 0 ? createPillGroup('updateBatchItem', item.id, 'locationDist', distOpts, item.suggestions.locationDist, 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-2">無子區域選項，請聯絡管理員新增</p>') : '<p class="text-[11px] font-bold text-slate-400 py-2">請先選擇左側縣市</p>'}
                     </div>
                 </div>
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 p-4 bg-indigo-50/40 rounded-xl border border-indigo-100 shadow-sm">
                     <div>
-                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">發行年份</label><button onclick="window.openAddTagModal('year')" class="text-indigo-500 hover:text-indigo-700 bg-indigo-100 hover:bg-indigo-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">發行年份</label>${canAddTag ? `<button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}</div>
                         ${createPillGroup('updateBatchItem', item.id, 'year', yearOpts, item.suggestions.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
                     </div>
                     <div>
                         <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">語系 / 刊物</label>
-                        ${item.suggestions.year ? `<button onclick="window.openAddTagModal('yearEdition', '${item.suggestions.year}')" class="text-indigo-500 hover:text-indigo-700 bg-indigo-100 hover:bg-indigo-200 p-1 rounded-md" title="在此新增"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}</div>
-                        ${item.suggestions.year ? (editionOpts.length > 0 ? createPillGroup('updateBatchItem', item.id, 'yearEdition', editionOpts, item.suggestions.yearEdition, 'bg-indigo-100 border-indigo-300 text-indigo-800') : '<p class="text-[11px] font-bold text-slate-400 py-2">無子項目，請新增</p>') : '<p class="text-[11px] font-bold text-slate-400 py-2">請先選擇年份</p>'}
+                        ${item.suggestions.year && canAddTag ? `<button onclick="window.openAddTagModal('yearEdition', '${item.suggestions.year}')" class="text-indigo-500 bg-indigo-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}</div>
+                        ${item.suggestions.year ? (editionOpts.length > 0 ? createPillGroup('updateBatchItem', item.id, 'yearEdition', editionOpts, item.suggestions.yearEdition, 'bg-indigo-100 border-indigo-300 text-indigo-800') : '<p class="text-[11px] font-bold text-slate-400 py-2">無子項目，請聯絡管理員新增</p>') : '<p class="text-[11px] font-bold text-slate-400 py-2">請先選擇年份</p>'}
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">內容分類 (可多選)</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">內容分類 (可多選)</label>${canAddTag ? `<button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}</div>
                         ${createMultiPillGroup('updateBatchItem', item.id, 'content', state.categories.content, item.suggestions.content, 'bg-blue-100 border-blue-300 text-blue-800')}
                     </div>
                     <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">雜誌期數</label><button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">雜誌期數</label>${canAddTag ? `<button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}</div>
                         ${createPillGroup('updateBatchItem', item.id, 'issue', state.categories.issue, item.suggestions.issue, 'bg-violet-100 border-violet-300 text-violet-800')}
                     </div>
                     <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">相關備註</label><button onclick="window.openAddTagModal('remarks')" class="text-amber-500 bg-amber-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        <div class="flex items-center justify-between mb-2"><label class="text-[10px] uppercase font-bold text-slate-500">相關備註</label>${canAddTag ? `<button onclick="window.openAddTagModal('remarks')" class="text-amber-500 bg-amber-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}</div>
                         ${createPillGroup('updateBatchItem', item.id, 'remarks', state.categories.remarks || [], item.suggestions.remarks, 'bg-amber-100 border-amber-300 text-amber-800')}
                     </div>
                 </div>
@@ -909,6 +964,7 @@
             const distOpts = photo.locationCity ? state.categories.locationHierarchy[photo.locationCity] : [];
             const yearOpts = Object.keys(state.categories.yearHierarchy || {});
             const editionOpts = photo.year ? (state.categories.yearHierarchy[photo.year] || []) : [];
+            const canAddTag = state.user?.role === 'admin' || state.user?.role === 'senior_editor';
             
             return `
                 <div class="flex flex-col gap-2 mb-2">
@@ -922,16 +978,16 @@
                     <div>
                         <div class="flex items-center justify-between mb-3">
                             <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">國家 / 縣市</label>
-                            <button onclick="window.openAddTagModal('locationCity')" class="text-emerald-500 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                            ${canAddTag ? `<button onclick="window.openAddTagModal('locationCity')" class="text-emerald-500 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
                         </div>
                         ${createPillGroup('updateEditModalField', null, 'locationCity', cityOpts, photo.locationCity, 'bg-emerald-100 border-emerald-300 text-emerald-800')}
                     </div>
                     <div>
                         <div class="flex items-center justify-between mb-3">
                             <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">鄉鎮市區</label>
-                            ${photo.locationCity ? `<button onclick="window.openAddTagModal('locationDist', '${photo.locationCity}')" class="text-emerald-500 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
+                            ${photo.locationCity && canAddTag ? `<button onclick="window.openAddTagModal('locationDist', '${photo.locationCity}')" class="text-emerald-500 bg-emerald-100 hover:bg-emerald-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
                         </div>
-                        ${photo.locationCity ? (distOpts.length > 0 ? createPillGroup('updateEditModalField', null, 'locationDist', distOpts, photo.locationDist, 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選縣市</p>'}
+                        ${photo.locationCity ? (distOpts.length > 0 ? createPillGroup('updateEditModalField', null, 'locationDist', distOpts, photo.locationDist, 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請聯絡管理員新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選縣市</p>'}
                     </div>
                 </div>
 
@@ -939,37 +995,36 @@
                     <div>
                         <div class="flex items-center justify-between mb-3">
                             <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">發行年份</label>
-                            <button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 hover:bg-indigo-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                            ${canAddTag ? `<button onclick="window.openAddTagModal('year')" class="text-indigo-500 bg-indigo-100 hover:bg-indigo-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
                         </div>
                         ${createPillGroup('updateEditModalField', null, 'year', yearOpts, photo.year, 'bg-indigo-100 border-indigo-300 text-indigo-800')}
                     </div>
                     <div>
                         <div class="flex items-center justify-between mb-3">
                             <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">語系 / 刊物</label>
-                            ${photo.year ? `<button onclick="window.openAddTagModal('yearEdition', '${photo.year}')" class="text-indigo-500 bg-indigo-100 hover:bg-indigo-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
+                            ${photo.year && canAddTag ? `<button onclick="window.openAddTagModal('yearEdition', '${photo.year}')" class="text-indigo-500 bg-indigo-100 hover:bg-indigo-200 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}
                         </div>
-                        ${photo.year ? (editionOpts.length > 0 ? createPillGroup('updateEditModalField', null, 'yearEdition', editionOpts, photo.yearEdition, 'bg-indigo-100 border-indigo-300 text-indigo-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選年份</p>'}
+                        ${photo.year ? (editionOpts.length > 0 ? createPillGroup('updateEditModalField', null, 'yearEdition', editionOpts, photo.yearEdition, 'bg-indigo-100 border-indigo-300 text-indigo-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請聯絡管理員新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選年份</p>'}
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">內容分類 (可多選)</label><button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">內容分類 (可多選)</label>${canAddTag ? `<button onclick="window.openAddTagModal('content')" class="text-blue-500 bg-blue-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}</div>
                         ${createMultiPillGroup('updateEditModalField', null, 'content', state.categories.content, photo.content, 'bg-blue-100 border-blue-300 text-blue-800')}
                     </div>
                     <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">雜誌期數</label><button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">雜誌期數</label>${canAddTag ? `<button onclick="window.openAddTagModal('issue')" class="text-violet-500 bg-violet-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}</div>
                         ${createPillGroup('updateEditModalField', null, 'issue', state.categories.issue, photo.issue, 'bg-violet-100 border-violet-300 text-violet-800')}
                     </div>
                     <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">相關備註</label><button onclick="window.openAddTagModal('remarks')" class="text-amber-500 bg-amber-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+                        <div class="flex items-center justify-between mb-3"><label class="block text-[10px] uppercase font-bold text-slate-500">相關備註</label>${canAddTag ? `<button onclick="window.openAddTagModal('remarks')" class="text-amber-500 bg-amber-100 p-1 rounded-md"><i data-lucide="plus" class="w-3 h-3"></i></button>` : ''}</div>
                         ${createPillGroup('updateEditModalField', null, 'remarks', state.categories.remarks || [], photo.remarks, 'bg-amber-100 border-amber-300 text-amber-800')}
                     </div>
                 </div>
             `;
         }
 
-        // === STREAMING_CHUNK:Rendering Bulk Edit Form... ===
         function renderBulkEditModalForm() {
             const data = state.bulkEdit.data;
             const cityOpts = Object.keys(state.categories.locationHierarchy);
@@ -990,7 +1045,7 @@
                     </div>
                     <div>
                         <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-3">統一變更 鄉鎮市區</label>
-                        ${data.locationCity ? (distOpts.length > 0 ? createPillGroup('updateBulkEditField', null, 'locationDist', distOpts, data.locationDist || '', 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請至左側過濾區新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選縣市</p>'}
+                        ${data.locationCity ? (distOpts.length > 0 ? createPillGroup('updateBulkEditField', null, 'locationDist', distOpts, data.locationDist || '', 'bg-emerald-100 border-emerald-300 text-emerald-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請聯絡管理員新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選縣市</p>'}
                     </div>
                 </div>
 
@@ -1001,7 +1056,7 @@
                     </div>
                     <div>
                         <label class="block text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-3">統一變更 語系 / 刊物</label>
-                        ${data.year ? (editionOpts.length > 0 ? createPillGroup('updateBulkEditField', null, 'yearEdition', editionOpts, data.yearEdition || '', 'bg-indigo-100 border-indigo-300 text-indigo-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請至左側過濾區新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選年份</p>'}
+                        ${data.year ? (editionOpts.length > 0 ? createPillGroup('updateBulkEditField', null, 'yearEdition', editionOpts, data.yearEdition || '', 'bg-indigo-100 border-indigo-300 text-indigo-800') : '<p class="text-[11px] font-bold text-slate-400 py-1">無選項，請聯絡管理員新增</p>') : '<p class="text-[11px] font-bold text-slate-400">先選年份</p>'}
                     </div>
                 </div>
 
@@ -1044,7 +1099,8 @@
                             ${state.uploadBatch.map((item, index) => `
                                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col xl:flex-row gap-6 relative">
                                     <div class="w-full xl:w-64 h-48 xl:h-auto xl:aspect-[4/3] rounded-xl overflow-hidden relative shrink-0 bg-slate-100 border border-slate-100">
-                                        <img src="${item.url}" class="w-full h-full object-cover" />
+                                        <!-- 更新：批次上傳預覽圖也加入禁用右鍵與拖曳的屬性 -->
+                                        <img src="${item.url}" oncontextmenu="return false;" draggable="false" class="w-full h-full object-cover pointer-events-none select-none" />
                                         ${state.batchStatus === 'analyzing' ? `<div class="absolute inset-0 bg-blue-900/50 flex items-center justify-center backdrop-blur-[2px]"><div class="absolute top-0 left-0 w-full h-0.5 bg-blue-400 shadow-[0_0_12px_#60a5fa] scan-line" style="animation-delay: ${index * 0.2}s"></div><i data-lucide="cpu" class="w-8 h-8 text-white animate-pulse"></i></div>` : ''}
                                     </div>
                                     <div id="batch-item-form-${item.id}" class="flex-1 flex flex-col justify-center min-w-0 py-1 ${state.batchStatus === 'analyzing' || state.batchStatus === 'saving' ? 'opacity-50 pointer-events-none' : ''}">
@@ -1056,7 +1112,7 @@
                         <div class="px-6 py-5 border-t border-slate-200 bg-white flex justify-between items-center shrink-0">
                             <button onclick="window.closeBatchModal()" ${state.batchStatus === 'saving' ? 'disabled' : ''} class="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-all text-sm disabled:opacity-50">取消</button>
                             <button onclick="window.handleSaveBatch()" ${state.batchStatus === 'analyzing' || state.batchStatus === 'saving' ? 'disabled' : ''} class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold hover:from-blue-700 hover:to-indigo-700 disabled:opacity-70 transition-all shadow-lg transform active:scale-[0.98]">
-                                ${state.batchStatus === 'analyzing' ? '等待解析...' : state.batchStatus === 'saving' ? '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> 寫入資料庫...' : `確認收錄 (${state.uploadBatch.length}張)`}
+                                ${state.batchStatus === 'analyzing' ? '等待解析...' : state.batchStatus === 'saving' ? '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> 上傳並寫入庫...' : `確認收錄 (${state.uploadBatch.length}張)`}
                             </button>
                         </div>
                     </div>
@@ -1065,7 +1121,6 @@
 
             if (state.editModal.isOpen && state.editModal.photo) {
                 const photo = state.editModal.photo;
-                
                 html += `
                 <div class="fixed inset-0 z-[105] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6">
                     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-full animate-popIn">
@@ -1079,7 +1134,9 @@
                             </div>
                         </div>
                         <div class="px-6 py-5 border-t border-slate-100 bg-white flex justify-between items-center shrink-0">
-                            <div></div> 
+                            <div>
+                                ${state.user?.role === 'admin' ? `<button onclick="window.handleSingleDelete('${photo.id}')" class="px-4 py-2 text-sm text-rose-500 hover:bg-rose-50 rounded-xl transition-all font-bold flex items-center gap-1.5"><i data-lucide="trash-2" class="w-4 h-4"></i> 刪除照片</button>` : ''}
+                            </div> 
                             <div class="flex gap-3">
                                 <button onclick="window.closeEditModal()" class="px-5 py-2.5 text-sm text-slate-500 hover:bg-slate-100 rounded-xl transition-all font-bold">取消</button>
                                 <button onclick="window.savePhotoEdit()" class="px-8 py-2.5 text-sm bg-slate-900 text-white hover:bg-slate-800 rounded-xl transition-all shadow-lg font-bold transform active:scale-95">儲存變更</button>
@@ -1089,7 +1146,6 @@
                 </div>`;
             }
 
-            // === 批次修改標籤彈窗 ===
             if (state.bulkEdit.isOpen) {
                 html += `
                 <div class="fixed inset-0 z-[105] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6">
@@ -1182,6 +1238,11 @@
         }
 
         window.openEditModal = (photoId) => {
+            // 安全升級：改用白名單審核，只有這三種角色可以打開編輯面板
+            if (state.user?.role !== 'admin' && state.user?.role !== 'senior_editor' && state.user?.role !== 'editor') { 
+                alert("權限不足：您只能上傳照片，無法修改標籤。"); 
+                return; 
+            }
             const photo = state.photos.find(p => p.id === photoId);
             if (photo) { 
                 let cText = photo.customText !== undefined ? photo.customText : '';
@@ -1198,12 +1259,20 @@
         };
         
         window.closeEditModal = () => { state.editModal = { isOpen: false, photo: null }; updateModals(); };
+        
+        // 單獨照片刪除 (自動切換成批次刪除的一員)
+        window.handleSingleDelete = (id) => {
+            state.selectedIds.clear();
+            state.selectedIds.add(id);
+            window.closeEditModal();
+            window.handleBatchDelete();
+        };
+
         window.updateEditModalCustomText = (val) => { if (state.editModal.photo) state.editModal.photo.customText = val; };
         
         window.updateEditModalField = (field, value) => {
             if (state.editModal.photo) {
                 if (field === 'content') {
-                    // 多選邏輯切換
                     if (!Array.isArray(state.editModal.photo.content)) state.editModal.photo.content = state.editModal.photo.content ? [state.editModal.photo.content] : [];
                     if (state.editModal.photo.content.includes(value)) state.editModal.photo.content = state.editModal.photo.content.filter(x => x !== value);
                     else state.editModal.photo.content.push(value);
@@ -1223,6 +1292,11 @@
 
         window.savePhotoEdit = async () => {
             if (!state.user || !state.editModal.photo) return;
+            // 雙重防護：送出儲存前再次驗證白名單
+            if (state.user?.role !== 'admin' && state.user?.role !== 'senior_editor' && state.user?.role !== 'editor') { 
+                alert("權限不足：無法儲存變更。"); 
+                return; 
+            }
             const photo = state.editModal.photo;
             const contentTags = Array.isArray(photo.content) ? photo.content : (photo.content ? [photo.content] : []);
             const tags = [photo.locationCity, photo.locationDist, photo.year, photo.yearEdition, ...contentTags, photo.issue, photo.remarks].filter(Boolean);
@@ -1256,143 +1330,99 @@
             } catch (err) { console.error(err); alert("儲存失敗"); }
         };
 
-        // === STREAMING_CHUNK:Bulk Edit Logic... ===
         window.openBulkEditModal = () => {
-            state.bulkEdit = {
-                isOpen: true,
-                data: { content: null, year: null, yearEdition: null, issue: null, remarks: null, locationCity: null, locationDist: null }
-            };
+            // 安全升級：改用白名單審核，只有這三種角色可以打開批次編輯面板
+            if (state.user?.role !== 'admin' && state.user?.role !== 'senior_editor' && state.user?.role !== 'editor') { 
+                alert("權限不足：您無法批次修改標籤。"); 
+                return; 
+            }
+            state.bulkEdit = { isOpen: true, data: { content: null, year: null, yearEdition: null, issue: null, remarks: null, locationCity: null, locationDist: null } };
             updateModals();
         };
 
-        window.closeBulkEditModal = () => {
-            state.bulkEdit.isOpen = false;
-            updateModals();
-        };
+        window.closeBulkEditModal = () => { state.bulkEdit.isOpen = false; updateModals(); };
 
         window.updateBulkEditField = (field, value) => {
             if (field === 'content') {
                 if (state.bulkEdit.data.content === null) state.bulkEdit.data.content = [];
-                // 如果點選空字串(解除選取)，將該標籤移除
                 if (value === '') return; 
-                
                 if (state.bulkEdit.data.content.includes(value)) {
                     state.bulkEdit.data.content = state.bulkEdit.data.content.filter(x => x !== value);
-                    if (state.bulkEdit.data.content.length === 0) state.bulkEdit.data.content = null; // 全取消視同無修改
-                } else {
-                    state.bulkEdit.data.content.push(value);
-                }
+                    if (state.bulkEdit.data.content.length === 0) state.bulkEdit.data.content = null; 
+                } else { state.bulkEdit.data.content.push(value); }
             } else {
-                if (value === '') {
-                    // 取消選取視同「不修改該欄位」
-                    state.bulkEdit.data[field] = null;
-                } else {
-                    state.bulkEdit.data[field] = value;
-                }
-                
+                if (value === '') { state.bulkEdit.data[field] = null; } else { state.bulkEdit.data[field] = value; }
                 if (field === 'locationCity' && state.bulkEdit.data.locationDist !== null) state.bulkEdit.data.locationDist = null;
                 if (field === 'year' && state.bulkEdit.data.yearEdition !== null) state.bulkEdit.data.yearEdition = null;
             }
             
             const formEl = document.getElementById('bulk-edit-form');
-            if (formEl) {
-                formEl.innerHTML = renderBulkEditModalForm();
-                lucide.createIcons({ root: formEl });
-            }
+            if (formEl) { formEl.innerHTML = renderBulkEditModalForm(); lucide.createIcons({ root: formEl }); }
         };
 
         window.saveBulkEdit = async () => {
             if (!state.user || state.selectedIds.size === 0) return;
-            
-            // 找出哪些欄位被設定了
-            const updates = {};
-            Object.keys(state.bulkEdit.data).forEach(key => {
-                if (state.bulkEdit.data[key] !== null) {
-                    updates[key] = state.bulkEdit.data[key];
-                }
-            });
-
-            if (Object.keys(updates).length === 0) {
-                window.closeBulkEditModal();
-                return; // 沒有勾選任何要修改的項目
+            // 雙重防護：送出批次儲存前再次驗證白名單
+            if (state.user?.role !== 'admin' && state.user?.role !== 'senior_editor' && state.user?.role !== 'editor') { 
+                alert("權限不足：無法儲存變更。"); 
+                return; 
             }
+            const updates = {};
+            Object.keys(state.bulkEdit.data).forEach(key => { if (state.bulkEdit.data[key] !== null) updates[key] = state.bulkEdit.data[key]; });
+            if (Object.keys(updates).length === 0) { window.closeBulkEditModal(); return; }
 
             const btn = document.getElementById('bulk-save-btn');
             if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 儲存中...'; lucide.createIcons({ root: btn }); }
 
             try {
-                const legacyIds = [];
-                const batchGroups = {};
-
-                // 將選取的照片分為獨立照片與批次照片
+                const legacyIds = []; const batchGroups = {};
                 state.selectedIds.forEach(id => {
                     const photo = state.photos.find(p => p.id === id);
                     if (photo) {
                         if (photo._isBatch) {
-                            if (!batchGroups[photo.batchId]) batchGroups[photo.batchId] = [];
-                            batchGroups[photo.batchId].push(photo);
-                        } else {
-                            legacyIds.push(photo);
-                        }
+                            if (!batchGroups[photo.batchId]) batchGroups[photo.batchId] = []; batchGroups[photo.batchId].push(photo);
+                        } else { legacyIds.push(photo); }
                     }
                 });
 
                 const promises = [];
-
-                // 1. 更新獨立照片
                 legacyIds.forEach(photo => {
                     const newPhoto = { ...photo, ...updates };
-                    
-                    // 內容分類(多選)採附加模式
                     if (updates.content) {
                         const oldContent = Array.isArray(photo.content) ? photo.content : (photo.content ? [photo.content] : []);
                         newPhoto.content = [...new Set([...oldContent, ...updates.content])];
                     }
-
                     const contentTags = Array.isArray(newPhoto.content) ? newPhoto.content : (newPhoto.content ? [newPhoto.content] : []);
                     const tags = [newPhoto.locationCity, newPhoto.locationDist, newPhoto.year, newPhoto.yearEdition, ...contentTags, newPhoto.issue, newPhoto.remarks].filter(Boolean);
                     newPhoto.title = [...tags, newPhoto.customText || ''].filter(Boolean).join('-') || '未命名圖片';
 
                     const updatePayload = { ...updates, title: newPhoto.title };
-                    if (updates.content) updatePayload.content = newPhoto.content; // 確保送出的是合併後的陣列
-
+                    if (updates.content) updatePayload.content = newPhoto.content;
                     promises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'photos', photo.id), updatePayload, { merge: true }));
-
-                    // 本地更新
                     const localIndex = state.photos.findIndex(p => p.id === photo.id);
                     if (localIndex > -1) state.photos[localIndex] = { ...state.photos[localIndex], ...updatePayload };
                 });
 
-                // 2. 更新批次陣列照片
                 Object.keys(batchGroups).forEach(batchId => {
                     const photosToUpdate = batchGroups[batchId];
                     const batchRef = doc(db, 'artifacts', appId, 'public', 'data', 'photo_batches', batchId);
-                    
                     promises.push(runTransaction(db, async (transaction) => {
                         const batchDoc = await transaction.get(batchRef);
                         if (batchDoc.exists()) {
-                            const items = batchDoc.data().items || [];
-                            let changed = false;
-                            
+                            const items = batchDoc.data().items || []; let changed = false;
                             photosToUpdate.forEach(photo => {
                                 const itemIndex = items.findIndex(i => i.id === photo.id);
                                 if (itemIndex > -1) {
                                     const newPhoto = { ...items[itemIndex], ...updates };
-                                    
-                                    // 內容分類(多選)採附加模式
                                     if (updates.content) {
                                         const oldContent = Array.isArray(items[itemIndex].content) ? items[itemIndex].content : (items[itemIndex].content ? [items[itemIndex].content] : []);
                                         newPhoto.content = [...new Set([...oldContent, ...updates.content])];
                                     }
-
                                     const contentTags = Array.isArray(newPhoto.content) ? newPhoto.content : (newPhoto.content ? [newPhoto.content] : []);
                                     const tags = [newPhoto.locationCity, newPhoto.locationDist, newPhoto.year, newPhoto.yearEdition, ...contentTags, newPhoto.issue, newPhoto.remarks].filter(Boolean);
                                     newPhoto.title = [...tags, newPhoto.customText || ''].filter(Boolean).join('-') || '未命名圖片';
 
-                                    items[itemIndex] = newPhoto;
-                                    changed = true;
-
-                                    // 本地更新
+                                    items[itemIndex] = newPhoto; changed = true;
                                     const localIndex = state.photos.findIndex(p => p.id === photo.id);
                                     if (localIndex > -1) state.photos[localIndex] = { ...state.photos[localIndex], ...newPhoto };
                                 }
@@ -1401,24 +1431,25 @@
                         }
                     }));
                 });
-
                 await Promise.all(promises);
-
-                window.closeBulkEditModal();
-                state.isSelectionMode = false;
-                state.selectedIds.clear();
-                updateGallery();
-                updateMoodBoard();
-
+                window.closeBulkEditModal(); state.isSelectionMode = false; state.selectedIds.clear();
+                updateGallery(); updateMoodBoard();
             } catch (err) {
-                console.error("Batch update error:", err);
-                alert("批次修改發生錯誤");
+                console.error("Batch update error:", err); alert("批次修改發生錯誤");
                 if (btn) { btn.disabled = false; btn.innerText = '確認套用變更'; }
             }
         };
 
         window.updateNewTagValue = (val) => { state.newTagValue = val; };
-        window.openAddTagModal = (type, parentCity = '') => { state.tagModal = { isOpen: true, type, parentCity, error: '' }; state.newTagValue = ''; updateModals(); };
+        
+        window.openAddTagModal = (type, parentCity = '') => { 
+            if (state.user?.role !== 'admin' && state.user?.role !== 'senior_editor') { 
+                alert("權限不足：只有管理員和資深編輯才能新增系統分類標籤。"); 
+                return; 
+            }
+            state.tagModal = { isOpen: true, type, parentCity, error: '' }; state.newTagValue = ''; updateModals(); 
+        };
+        
         window.closeTagModal = () => { state.tagModal.isOpen = false; updateModals(); };
 
         window.confirmAddTag = async () => {
@@ -1450,6 +1481,8 @@
 
         window.handleDeleteTag = (type, tagToDelete, e) => {
             if(e) e.stopPropagation();
+            if (state.user?.role !== 'admin') { alert("權限不足：只有管理員可以刪除系統分類標籤。"); return; }
+
             state.confirmDialog = {
                 isOpen: true, message: `確定要刪除標籤「${tagToDelete}」？\n(此操作不會影響已標記的照片)`, isPrimary: false,
                 action: async () => {
@@ -1556,32 +1589,75 @@
                 }
                 
                 const formEl = document.getElementById(`batch-item-form-${id}`);
-                if (formEl) {
-                    formEl.innerHTML = renderBatchItemForm(i);
-                    lucide.createIcons({ root: formEl });
-                }
+                if (formEl) { formEl.innerHTML = renderBatchItemForm(i); lucide.createIcons({ root: formEl }); }
             } 
         };
         
-        window.removeBatchItem = (id) => { state.uploadBatch = state.uploadBatch.filter(i=>i.id!==id); if(!state.uploadBatch.length) window.closeBatchModal(); else updateModals(); };
+        window.removeBatchItem = (id) => { 
+            state.confirmDialog = {
+                isOpen: true,
+                message: '確定要從本次 AI 上傳清單中移除這張照片嗎？',
+                isPrimary: false,
+                action: () => {
+                    state.uploadBatch = state.uploadBatch.filter(i=>i.id!==id); 
+                    if(!state.uploadBatch.length) window.closeBatchModal(); else updateModals(); 
+                    window.closeConfirmDialog();
+                }
+            };
+            updateModals();
+        };
+        
         window.closeBatchModal = () => { state.isBatchModalOpen = false; updateModals(); setTimeout(()=>{state.batchStatus='idle';state.uploadBatch=[];}, 300); };
 
         window.handleSaveBatch = async () => {
-            if (!state.user) return; state.batchStatus = 'saving'; updateModals();
+            if (!state.user) return; 
+            state.batchStatus = 'saving'; updateModals();
+            
             try {
-                const itemsToSave = state.uploadBatch.map(item => {
+                const itemsToSave = [];
+                for (let item of state.uploadBatch) {
                     const s = item.suggestions;
                     const contentTags = Array.isArray(s.content) ? s.content : (s.content ? [s.content] : []);
                     const tags = [s.locationCity, s.locationDist, s.year, s.yearEdition, ...contentTags, s.issue, s.remarks].filter(Boolean);
                     let finalTitle = [...tags, s.customText || ''].filter(Boolean).join('-');
-                    return { id: 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7), url: item.url, title: finalTitle || '未命名', customText: s.customText || '', content: contentTags, year: s.year || '', yearEdition: s.yearEdition || '', issue: s.issue || '', remarks: s.remarks || '', locationCity: s.locationCity || '', locationDist: s.locationDist || '', createdAt: Date.now() };
-                });
+                    
+                    let storageUrl = item.url;
+                    if (storageUrl.startsWith('data:image')) {
+                        try {
+                            const fileName = `photos/upload_${Date.now()}_${Math.random().toString(36).substring(2,7)}.jpg`;
+                            const imageRef = ref(storage, fileName);
+                            await uploadString(imageRef, item.url, 'data_url');
+                            storageUrl = await getDownloadURL(imageRef); 
+                        } catch (storageErr) {
+                            console.error("Storage 儲存失敗, 退回 Base64", storageErr);
+                        }
+                    }
+                    
+                    itemsToSave.push({ 
+                        id: 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7), 
+                        url: storageUrl, 
+                        title: finalTitle || '未命名', 
+                        customText: s.customText || '', 
+                        content: contentTags, 
+                        year: s.year || '', yearEdition: s.yearEdition || '', 
+                        issue: s.issue || '', remarks: s.remarks || '', 
+                        locationCity: s.locationCity || '', locationDist: s.locationDist || '', 
+                        createdAt: Date.now() 
+                    });
+                }
                 
                 const { addDoc, collection } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'photo_batches'), { items: itemsToSave, createdAt: Date.now() });
                 
-                window.closeBatchModal(); window.loadPhotos(); 
-            } catch (e) { console.error(e); state.batchStatus = 'review'; updateModals(); alert("儲存失敗"); }
+                window.closeBatchModal(); 
+                window.loadPhotos(); 
+                
+            } catch (e) { 
+                console.error(e); 
+                state.batchStatus = 'review'; 
+                updateModals(); 
+                alert("寫入資料庫失敗，請確認 Firebase 設定。"); 
+            }
         };
 
         lucide.createIcons(); 
